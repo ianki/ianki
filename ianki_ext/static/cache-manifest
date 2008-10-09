@@ -1,0 +1,11 @@
+CACHE MANIFEST
+/
+/index.html
+/static/ianki.js
+/static/base.css
+/static/mootools.js
+/static/favicon.ico
+
+
+NETWORK:
+anki/sync.html

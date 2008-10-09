@@ -1,0 +1,71 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html manifest="/static/cache-manifest">
+    <head>
+        <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
+        
+        <title>iAnki (dev)</title>
+        
+        <link rel="shorcut icon" href="/static/favicon.ico"/>
+        <link rel="stylesheet" type="text/css" href="/static/base.css">
+
+        <script type="text/javascript" src="/static/mootools.js"></script>
+        <script type="text/javascript" src="/static/ianki.js"></script>
+
+    </head>
+    <body>
+    
+    <div id='infoMode' style='display:none'>
+        <div style="margin: 16px">
+            <div id="info" style="font-size: 32px; ">Welcome!</div>
+        </div>
+    </div>
+    
+    <div id='reviewMode' style='display:none'>
+        <div id="reviewContent" style="margin: 16px">
+            <div id="question" style="font-size: 20px; ">Sample question</div>
+            <div id="padding" style="font-size: 8px; ">&nbsp</div>
+            
+            <div id="showAnswerDiv" align='center'>
+                <button id="showAnswer" title="Show the answer" style="font-size: 28px; " onclick="iAnki.deck.showAnswer()">Show answer</button>
+                <div id="lastCardInfo" align='center' style="font-size: 10px; margin-top=30px; "></div>
+            </div>
+            
+            <div id="answerSide" style='display:none'>
+                <div id="answer" style="font-size: 20px; ">Sample answer</div>
+                <div id="padding" style="font-size: 8px; ">&nbsp</div>
+                <div align='center'>
+                    <button id='answer1' title='First time' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(0)'>1</button>
+                    <button id='answer2' title='Made a mistake' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(1)'>2</button>
+                    <button id='answer3' title='Difficult' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(2)'>3</button>
+                    <button id='answer4' title='About right' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(3)'>4</button>
+                    <button id='answer5' title='Easy' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(4)'>5</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id='changeDeckMode' style='display:none' style="margin: 16px">
+        <div id="info" style="font-size: 32px; margin: 16px">Change deck</div>
+        <table id='deckTable' style='font-size: 20px; margin: 16px'>
+        </table>
+    </div>
+    
+    <div id="padding" style="font-size: 40x; ">&nbsp</div>
+    <h1>
+        <table width=100%><TR>
+            <td>
+                <span id='title'>iAnki - Welcome</span>
+            </td>
+            <td align="right">
+                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Change deck</button>
+                <button title="Sync deck" id="syncDeck" onclick="iAnki.syncDeck(1)">Sync</button>
+            </td>
+        </tr></table>
+    </h1>
+    </div>
+
+    <div id='debugLog'>
+        <span id="ankilog"></span>
+    </div>
+	</body>
+</html>
