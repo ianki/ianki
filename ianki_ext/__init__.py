@@ -190,13 +190,13 @@ def getSetList(fields):
         fieldList += ', "' + f + '" = ?'
     return fieldList
 
-def procRow(table, row, update):
+def procRow(table, row, update, unique=''):
     ret = []
     if not update:
         i = 0
         for f in table:
             if f in ['id', 'factId', 'cardModelId', 'lastCardId', 'cardId', 'deckId', 'modelId', 'currentModelId']:
-                ret.append(str(row[i]))
+                ret.append(unique + str(row[i]))
             else:
                 ret.append(row[i])
             i += 1
@@ -210,6 +210,45 @@ def procRow(table, row, update):
             i += 1
         ret.append(str(row[0]))
     return ret
+
+update = {}
+def countUpdates():
+    ret = 0
+    for t in tables.keys():
+        ret += len(update[t]['modified'])
+        ret += len(update[t]['added'])
+    return ret
+        
+def getUpdate(maxCount):
+    ret = {}
+    ret['numUpdates'] = 0
+    for t in tables.keys():
+        ret[t] = {'modified':[], 'added':[]}
+        mlen = min(maxCount, len(update[t]['modified']))
+        if mlen > 0:
+            ret[t]['modified'] = update[t]['modified'][:mlen]
+            update[t]['modified'] = update[t]['modified'][mlen:]
+            maxCount -= mlen
+            ret['numUpdates'] += mlen
+        mlen = min(maxCount, len(update[t]['added']))
+        if mlen > 0:
+            ret[t]['added'] = update[t]['added'][:mlen]
+            update[t]['added'] = update[t]['added'][mlen:]
+            maxCount -= mlen
+            ret['numUpdates'] += mlen
+    return ret
+
+def printUpdate(up):
+    print >> sys.stderr, "numUpdates", up['numUpdates']
+    for t in tables.keys():
+        if len(update[t]['modified']) > 0:
+            print >>  sys.stderr, t, "modified"
+            for i in update[t]['modified']:
+                print >>  sys.stderr, "  ", i
+        if len(update[t]['added']) > 0:
+            print >>  sys.stderr, t, "added"
+            for i in update[t]['added']:
+                print >>  sys.stderr, "  ", i
 
 class anki_sync:
     def POST(self):
@@ -261,25 +300,52 @@ class anki_sync:
                         
                         # Send host updates
                         json['lastSyncHost'] = deck.modified
+                        global update
+                        update = {}
                         for t in tables.keys():
                             added = deck.s.all('SELECT %s FROM %s WHERE created > %f' % (getFieldList(tables[t]), t, data['lastSyncHost']))
                             modified = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables[t]), t, data['lastSyncHost'], data['lastSyncHost']))
+                            
+                            added = [procRow(tables[t], x, False) for x in added]
+                            if t in ['cards', 'facts']:
+                                for i in range(0,2):
+                                    added += added
+                            modified = [procRow(tables[t], x, True) for x in modified]
                             
                             if len(modified) > 0:
                                 ui.logMsg(' Syncing %d modified %s' % (len(modified), t))
                             if len(added) > 0:
                                 ui.logMsg(' Syncing %d new %s' % (len(added), t))
                             
-                            json[t+'_added'] = [procRow(tables[t], x, False) for x in added]
-                            json[t+'_modified'] = [procRow(tables[t], x, True) for x in modified]
+                            tableUpdate = {}
+                            '''
+                            tableUpdate['added'] = []
+                            #json[t+'_added'] = []
+                            for i in range(0,1):
+                                #json[t+'_added'] += [procRow(tables[t], x, False, str(i)) for x in added]
+                                tableUpdate['added'] += [procRow(tables[t], x, False, str(i)) for x in added]
+                            #json[t+'_modified'] = [procRow(tables[t], x, True) for x in modified]
+                            '''
+                            tableUpdate['added']    = [procRow(tables[t], x, False) for x in added]
+                            tableUpdate['modified'] = [procRow(tables[t], x, True) for x in modified]
+                            
+                            update[t] = tableUpdate;
                             
                             json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
                             json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
+                        json['numUpdates'] = countUpdates()
+                        json['updates'] = getUpdate(200)
+                        #printUpdate(json['updates'])
+                        #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                     finally:
                         deck.save()
                         deck.close()
                         
-                    ui.logMsg('Sync complete')
+                    #ui.logMsg('Sync complete')
+                elif data['method'] == 'nextsync':
+                    json['updates'] = getUpdate(200)
+                    #printUpdate(json['updates'])
+                    #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                 else:
                     json['error'] = 1
                     json['exception'] = 'Invalid method:' + data['method']
@@ -291,7 +357,7 @@ class anki_sync:
             json['error'] = 1
             json['exception'] = str(e)
             print >> sys.stderr, "Exception", e
-            ui.logMsg('There were errors during sync: ' + e)
+            ui.logMsg('There were errors during sync.')
         #print >> sys.stderr, "response", json
         res = simplejson.dumps(json, ensure_ascii=False)
         web.output(res)

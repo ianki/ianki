@@ -1008,6 +1008,25 @@ Deck.prototype.realSync = function(resCallback){
             }
         );
         
+        var reviewsSynched = 0;
+        var counts = {};
+        self.tables.each( function(table) {
+            counts[table] = [0,0];
+        });
+        
+        function finished() {
+            var info = 'Sync Finished\n';
+            if(reviewsSynched > 0)
+                info += '' + reviewsSynched + ' reviews synched\n';
+            self.tables.each( function(table) {
+                if(counts[table][0] > 0)
+                    info += '' + counts[table][0] + ' ' + table + ' updated.\n';
+                if(counts[table][1] > 0)
+                    info += '' + counts[table][1] + ' ' + table + ' added.\n';
+            });
+            alert(info);
+        }
+        
         // Get new reviewHistory
         var lastSyncHost;
         var lastSyncClient;
@@ -1042,14 +1061,12 @@ Deck.prototype.realSync = function(resCallback){
         dbTransaction(self.db,
             function(tx) {
                 var result = modifiedQ.result();
-                var info = 'Sync Finished\n';
                 anki_log(" reviewHistory changed " + result.rows.length);
                 var diff = [];
                 for(var i = 0; i < result.rows.length; i++){
                     diff[i] = result.rows.item(i);
                 }
-                if(result.rows.length > 0)
-                    info += result.rows.length+' reviews synched.\n';
+                reviewsSynched = result.rows.length;
                 sendData['reviewHistory'] = diff;
                 sendData['method'] = 'realsync';
                 sendData['syncName'] = self.syncName;
@@ -1063,7 +1080,120 @@ Deck.prototype.realSync = function(resCallback){
                             resCallback();
                             return;
                         }
-                                                
+                        
+                        var numUpdates = json['numUpdates']
+                        var updatesDone = 0;
+                        
+                        function requestNext() {
+                            anki_log('requestNext ' + updatesDone + ' ' + numUpdates);
+                            var requestUp = new Request.JSON({
+                                url: '/anki/sync.html',
+                                data: JSON.encode({'method':'nextsync', 'syncName':'self.syncName'}),
+                                onSuccess: function(result){
+                                    if(result['error'] != 0) {
+                                        alert("Error syncing deck: " + result['exception']);
+                                        resCallback();
+                                        return;
+                                    }
+                                    
+                                    applyNext(result['updates']);
+                                }
+                            }).POST();
+                        }
+                        
+                        function applyNext(updates) {
+                            dbTransaction(self.db,
+                                function(tx) {
+                                    updatesDone += updates['numUpdates'];
+                                    if(updatesDone < numUpdates && updates['numUpdates'] != 0)
+                                    {
+                                        requestNext();
+                                    }
+                                    
+                                    self.tables.each(
+                                        function(table) {
+                                            // Apply updates
+                                            anki_log(table + ' modified ' + updates[table]['modified'].length + ' added ' + updates[table]['added'].length);
+                                            {
+                                                var sql = json[table+'_sql_update'];
+                                                updates[table]['modified'].each(
+                                                    function(row){
+                                                        dbSql(tx, sql, row);
+                                                        //anki_log('Update id ' + row[0])
+                                                    }
+                                                );                                                    
+                                                counts[table][0] += updates[table]['modified'].length;
+                                            }
+                                            {
+                                                var sql = json[table+'_sql_insert'];
+                                                updates[table]['added'].each(
+                                                    function(row){
+                                                        dbSql(tx, sql, row);
+                                                        //anki_log('Add id ' + row[0])
+                                                    }
+                                                );                                                   
+                                                counts[table][1] += updates[table]['added'].length;
+                                            }
+                                        }
+                                    );
+                                },
+                                function(error) {
+                                    alert("Error syncing deck: " + error);
+                                    resCallback();
+                                },
+                                function() {
+                                    //updatesDone += updates['numUpdates'];
+                                    document.title = 'iAnki (dev) - Synched ' + updatesDone + '/' + numUpdates + ' items';
+                                    
+                                    if(updatesDone < numUpdates && updates['numUpdates'] != 0)
+                                    {
+                                        //requestNext();
+                                    }
+                                    else
+                                    {
+                                        // Finished sync
+                                        dbTransaction(self.db,
+                                            function(tx) {
+                                                dbSql(tx, 'UPDATE syncTimes SET lastSyncHost=?, lastSyncClient=?',[json['lastSyncHost'], nowInSeconds()]);
+                                            }
+                                        );
+                                        
+                                        dbTransaction(self.db,
+                                            function(tx) {
+                                                finished();
+                                                self.loadDeck();
+                                                resCallback();
+                                                $('syncDeck').disabled = false;
+                                            }
+                                        );
+                                    }
+                                }
+                            );
+                        }
+                        
+                        applyNext(json['updates']);
+                        /*
+                        var requestUp = new Request.JSON({
+                        url: '/anki/sync.html',
+                        data: JSON.encode({'method':'nextsync', 'syncName':'self.syncName'}),
+                        onSuccess: function(json){
+                            if(json['error'] != 0) {
+                                anki_exception("Error syncing deck:" + json['exception']);
+                                resCallback();
+                                return;
+                            }
+                        }
+                        */
+                        
+                        /*
+                        var updates = json['updates']
+                        var syncCount = 0;
+                        var totalCount = 0;
+                        
+                        function countTable(table){
+                            totalCount += json[table+'_modified'].length;
+                            totalCount += json[table+'_added'].length;
+                        }
                         function syncTable(table){
                             var count = 0;
                             dbTransaction(self.db,
@@ -1075,6 +1205,9 @@ Deck.prototype.realSync = function(resCallback){
                                         json[table+'_modified'].each(
                                             function(row){
                                                 dbSql(tx, sql, row);
+                                                syncCount+=1;
+                                                if((syncCount % 100) == 0)
+                                                    document.title = 'iAnki (dev) - Synched items ' + syncCount + ' of totalCount ' + totalCount;
                                                 //anki_log('Update id ' + row[0])
                                             }
                                         );
@@ -1087,6 +1220,9 @@ Deck.prototype.realSync = function(resCallback){
                                             function(row){
                                                 dbSql(tx, sql, row);
                                                 //anki_log('Add id ' + row[0])
+                                                syncCount+=1;
+                                                if((syncCount % 100) == 0)
+                                                    document.title = 'iAnki (dev) - Synched items ' + syncCount + ' of totalCount ' + totalCount;
                                             }
                                         );
                                         if(json[table+'_added'].length > 0)
@@ -1096,7 +1232,8 @@ Deck.prototype.realSync = function(resCallback){
                             );
                         }
                         
-                        self.tables.each( function(table) {syncTable(table); });
+                        self.tables.each( countTable(table));
+                        self.tables.each( syncTable(table));
                         
                         dbTransaction(self.db,
                             function(tx) {
@@ -1113,6 +1250,7 @@ Deck.prototype.realSync = function(resCallback){
                                 $('syncDeck').disabled = false;
                             }
                         );
+                        */
                     },
                     onFailure: function(){
                         alert('Sync failed.');
@@ -1168,7 +1306,7 @@ Deck.prototype.initialize = function(){
 	var self = this;
 	try {
         anki_log('Init deck' + self.syncName);
-		self.db = dbOpen("iAnki "+self.syncName+" deck", "1.1", "iAnki "+self.syncName+" deck", 2000000);
+		self.db = dbOpen("iAnki "+self.syncName+" deck", "1.1", "iAnki "+self.syncName+" deck", 4000000);
         anki_log(' create tables');
 		dbTransaction(self.db,
 			function(tx)
@@ -1358,6 +1496,26 @@ Deck.prototype.initialize = function(){
 								type = 1 and isDue = 1 \
 								order by type, isDue, priority desc, relativeDelay \
 								');
+                
+                dbSql(tx,'create index if not exists ix_cards_markExpired on cards \
+                            (isDue, priority desc, combinedDue desc)');
+                
+                dbSql(tx,'create index if not exists ix_cards_failedIsDue on cards \
+                        (type, isDue, combinedDue)');
+                
+                dbSql(tx,'create index if not exists ix_cards_failedOrder on cards \
+                        (type, isDue, due)');
+                
+                dbSql(tx,'create index if not exists ix_cards_revisionOrder on cards \
+                        (type, isDue, priority desc, relativeDelay)');
+                
+                dbSql(tx,'create index if not exists ix_cards_newRandomOrder on cards \
+                        (priority desc, factId, ordinal)');
+                
+                dbSql(tx,'create index if not exists ix_cards_newOrderedOrder on cards \
+                        (priority desc, due)');
+                
+                dbSql(tx,'create index if not exists ix_cards_factId on cards (factId)');
 			}
 		);
         
@@ -1408,7 +1566,7 @@ IAnki.prototype.initialize = function() {
         }
                 
         // Init deck index
-        self.dbBase = dbOpen('iAnki Settings', "1.1", "iAnki settings database", 50000);
+        self.dbBase = dbOpen('iAnki Settings', "1.1", "iAnki settings database", 100000);
         
         var settingsQ;
 		dbTransaction(self.dbBase,
