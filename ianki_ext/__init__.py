@@ -336,7 +336,7 @@ class anki_sync:
                         pickCards = []
                         pickCardsIds = set()
                         checkTime = time.time()
-                        prevTime = checkTime - 60
+                        prevTime = 0
                         for hour in range(0, 48):
                             if gotCards == maxCards:
                                 break
