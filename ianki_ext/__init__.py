@@ -318,23 +318,74 @@ class anki_sync:
                         global update
                         update = {}
                         
+                        cardFields = tables['cards']
+                        cardIdIndex = cardFields.index('id')
+                        cardFactIdIndex = cardFields.index('factId')
+                        cardModifiedIndex = cardFields.index('modified')
+                        factFields = tables['facts']
+                        factIdIndex = factFields.index('id')
+                        factModelIdIndex = factFields.index('modelId')
+                        factModifiedIndex = factFields.index('modified')
+                        modelFields = tables['models']
+                        modelIdIndex = modelFields.index('id')
+                        modelModifiedIndex = modelFields.index('modified')
+                        
                         # Get cards to review for the next 2 days, up to maxCards
                         maxCards = 400
-                        #pickCardIds = {}
-                        #for hour in range(0, 48):
-                        pickCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                            type in (0,1) AND combinedDue < (strftime("%%s", "now") + 172800) AND priority != 0 \
-                                            ORDER BY combinedDue, type, priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards))
+                        gotCards = 0
+                        pickCards = []
+                        pickCardsIds = set()
+                        checkTime = time.time()
+                        prevTime = checkTime - 60
+                        for hour in range(0, 48):
+                            if gotCards == maxCards:
+                                break
+                            
+                            # First pick due failed cards
+                            failedCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
+                                                ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                            
+                            for c in failedCards:
+                                cardId = c[cardIdIndex]
+                                if cardId not in pickCardsIds:
+                                    pickCardsIds.add(cardId)
+                                    pickCards.append(c)
+                                    gotCards += 1
+                                    
+                            # Next pick due review cards
+                            reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
+                                                ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                            
+                            for c in reviewCards:
+                                cardId = c[cardIdIndex]
+                                if cardId not in pickCardsIds:
+                                    pickCardsIds.add(cardId)
+                                    pickCards.append(c)
+                                    gotCards += 1
+                            
+                            prevTime = checkTime - 60
+                            checkTime += 60 * 60
                         
-                        if deck.newCardOrder == 0: # random
-                            pickCards += deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 2, factId, ordinal \
-                                                ORDER BY priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards - len(pickCards)))
-                        else: # ordered
-                            pickCards += deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 2 \
-                                                ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - len(pickCards)))
-                        
+                        # Finally pick new cards
+                        if gotCards < maxCards:
+                            if deck.newCardOrder == 0: # random
+                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                    type = 2, factId, ordinal \
+                                                    ORDER BY priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
+                                
+                            else: # ordered
+                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                    type = 2 \
+                                                    ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
+                            for c in newCards:
+                                cardId = c[cardIdIndex]
+                                if cardId not in pickCardsIds:
+                                    pickCardsIds.add(cardId)
+                                    pickCards.append(c)
+                                    gotCards += 1
+                            
                         print >> sys.stderr, 'Sync', len(pickCards)
                         
                         haveCards = set()
@@ -350,19 +401,7 @@ class anki_sync:
                         updateCards = [[],[],[]] # modify, add, remove
                         updateFacts = [[],[],[]] # modify, add, remove
                         updateModels = [[],[],[]] # modify, add, remove
-                        
-                        cardFields = tables['cards']
-                        cardIdIndex = cardFields.index('id')
-                        cardFactIdIndex = cardFields.index('factId')
-                        cardModifiedIndex = cardFields.index('modified')
-                        factFields = tables['facts']
-                        factIdIndex = factFields.index('id')
-                        factModelIdIndex = factFields.index('modelId')
-                        factModifiedIndex = factFields.index('modified')
-                        modelFields = tables['models']
-                        modelIdIndex = modelFields.index('id')
-                        modelModifiedIndex = modelFields.index('modified')
-                        
+                                               
                         pickFacts = {}
                         for card in pickCards:
                             cardId = card[cardIdIndex]
