@@ -307,9 +307,6 @@ class anki_sync:
                             modified = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables[t]), t, data['lastSyncHost'], data['lastSyncHost']))
                             
                             added = [procRow(tables[t], x, False) for x in added]
-                            if t in ['cards', 'facts']:
-                                for i in range(0,2):
-                                    added += added
                             modified = [procRow(tables[t], x, True) for x in modified]
                             
                             if len(modified) > 0:
