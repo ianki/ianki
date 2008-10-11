@@ -59,7 +59,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.server = None
         
         if 'ianki_ip' not in self.config:
-            self.config['ianki_ip'] = '0.0.0.0'
+            self.config['ianki_ip'] = 'localhost'
         if 'ianki_port' not in self.config:
             self.config['ianki_port'] = '8000'
         

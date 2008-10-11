@@ -65,6 +65,17 @@ function today(date){
 	return date.getFullYear() + '-' + String.leftPad(date.getMonth()+1, 2, '0') + '-' + String.leftPad(date.getDate(), 2, '0');
 }
 
+function timeString(period) {
+    if(period < 60)
+        return '' + Math.floor(period) + ' seconds';
+    else if(period < 60*60)
+        return '' + Math.floor(period/60) + ' minutes';
+    else if(period < 24*60*60)
+        return '' + Math.floor(period/(60*60)) + ' hours';
+    else
+        return '' + Math.floor(period/(24*60*60)) + ' days';
+}
+
 function getRandomArbitary(min, max)
 {
   return Math.random() * (max - min) + min;
@@ -92,7 +103,7 @@ function dbTransaction(db, callback1, callback2, callback3){
 		},
 		function(error){
 			try {
-				anki_log("Transaction error - " + error.message);
+				anki_exception("Transaction error - " + error.message);
 				if(callback2)
 					callback2(error);
 			}
@@ -126,7 +137,7 @@ function dbSql(tx, sql, args, callback1, callback2){
 			},
 			function(tx, error){
 				try {
-					anki_log("dbSql error - " + sql + " | " + error.message);
+					anki_exception("dbSql error - " + sql + " | " + error.message);
 					if(callback2)
 						callback2(tx, error);
 				}
@@ -338,7 +349,7 @@ Deck.prototype.getNewCard = function(tx, resCallback){
 			if (result.rows.length > 0) {
 				var card = result.rows.item(0);
 				anki_log('Trace getNewCard: ' + card['id'] + ', ' + card['question']);
-				resCallback(card);
+				resCallback(new cloneObject(card));
 			}
 			else {
 				resCallback(null);
@@ -357,7 +368,7 @@ Deck.prototype.getDueCardNow = function(tx, resCallback){
 			if (result.rows.length > 0) {
 				var card = result.rows.item(0);
 				anki_log('Trace getDueCardNow: ' + card['id'] + ', ' + card['question']);
-				resCallback(card);
+				resCallback(new cloneObject(card));
 			}
 			else {
 				self.getNewCard(tx, resCallback);
@@ -376,7 +387,7 @@ Deck.prototype.getFailedCardNow = function(tx, resCallback){
 			if (result.rows.length > 0) {
 				var card = result.rows.item(0);
 				anki_log('Trace getFailedCardNow: ' + card['id'] + ', ' + card['question']);
-				resCallback(card);
+				resCallback(new cloneObject(card));
 			}
 			else {
 				self.getDueCardNow(tx, resCallback);
@@ -400,11 +411,8 @@ Deck.prototype.getNextCard = function(resCallback){
 		function(tx)
 		{
 			try {
-				self.getFailedCardNow(tx,
-                        function(card){
-                            card = new cloneObject(card);
-                            resCallback(card);
-                        }
+				self.getFailedCardNow(  tx,
+                                        resCallback
                 );
 			}
 			catch(e){
@@ -902,17 +910,8 @@ Deck.prototype.answerCard = function(ease){
 							set modified = ?',[time]);
                 
                 // Update lastCardInfo
-                var next;
                 var dueIn = card.due - time;
-                if(dueIn < 60)
-                    next = '' + Math.floor(dueIn) + ' seconds';
-                else if(dueIn < 60*60)
-                    next = '' + Math.floor(dueIn/60) + ' minutes';
-                else if(dueIn < 24*60*60)
-                    next = '' + Math.floor(dueIn/(60*60)) + ' hours';
-                else
-                    next = '' + Math.floor(dueIn/(24*60*60)) + ' days';
-                
+                var next = timeString(dueIn);
                 $('lastCardInfo').innerHTML = ' <br>'+card.question+'<br>Will be shown again in '+next+'.';
                 
 				// Finally after all the previous transactions are finished, show the next card.
@@ -933,8 +932,8 @@ Deck.prototype.nextCard = function() {
 	
 	this.getNextCard(
 		function(card){
-			self.currCard = new cloneObject(card);
-			if(self.currCard != null){
+            if(card != null){
+                self.currCard = new cloneObject(card);
                 $('question').innerHTML = self.currCard.question;
                 $('answer').innerHTML = self.currCard.answer;
                 $('showAnswerDiv').style.display = 'block';
@@ -947,9 +946,29 @@ Deck.prototype.nextCard = function() {
                 iAnki.setMode($('reviewMode'));
 			}
 			else {
-                iAnki.setTitle('iAnki - Welcome');
-                iAnki.setInfo('No reviews to do at this time');
-                iAnki.setMode($('infoMode'));
+                self.currCard = null;
+             
+                var nextReviewQ;   
+                dbTransaction(self.db,
+                    function(tx){
+                        nextReviewQ = new dbSqlQ(tx,'SELECT min(combinedDue) FROM cards WHERE priority != 0', []);
+                    }
+                );
+                
+                dbTransaction(self.db,
+                    function(tx){
+                        iAnki.setTitle('iAnki - Welcome');
+                        if(nextReviewQ.result().rows.length > 0) {
+                            var dueIn = Math.max(0, nextReviewQ.result().rows.item(0)['min(combinedDue)'] - nowInSeconds());
+                            iAnki.setInfo('No reviews to do at this time.<br>The next review will be in ' +
+                                        timeString(dueIn) + '.');
+                        }
+                        else {
+                            iAnki.setInfo('There are no cards to review.');
+                        }
+                        iAnki.setMode($('infoMode'));
+                    }
+                );
 			}
 		}
 	);
@@ -1011,7 +1030,7 @@ Deck.prototype.realSync = function(resCallback){
         var reviewsSynched = 0;
         var counts = {};
         self.tables.each( function(table) {
-            counts[table] = [0,0];
+            counts[table] = [0,0,0];
         });
         
         function finished() {
@@ -1020,9 +1039,11 @@ Deck.prototype.realSync = function(resCallback){
                 info += '' + reviewsSynched + ' reviews synched\n';
             self.tables.each( function(table) {
                 if(counts[table][0] > 0)
-                    info += '' + counts[table][0] + ' ' + table + ' updated.\n';
+                    info += '' + counts[table][0] + ' ' + table + ' removed.\n';
                 if(counts[table][1] > 0)
-                    info += '' + counts[table][1] + ' ' + table + ' added.\n';
+                    info += '' + counts[table][1] + ' ' + table + ' updated.\n';
+                if(counts[table][2] > 0)
+                    info += '' + counts[table][2] + ' ' + table + ' added.\n';
             });
             alert(info);
         }
@@ -1031,6 +1052,9 @@ Deck.prototype.realSync = function(resCallback){
         var lastSyncHost;
         var lastSyncClient;
         var modifiedQ;
+        var haveCardsQ;
+        var haveFactsQ;
+        var haveModelsQ;
         dbTransaction(self.db,
             function(tx) {
                 if(settingsQ.result().rows.length == 0){
@@ -1054,6 +1078,9 @@ Deck.prototype.realSync = function(resCallback){
                 
                 // Get history modified since last client sync time
                 modifiedQ = new dbSqlQ(tx, 'SELECT cardId,time,ease,thinkingTime FROM reviewHistory WHERE time > ?',[lastSyncClient]);
+                haveCardsQ = new dbSqlQ(tx, 'SELECT id FROM cards',[]);
+                haveFactsQ = new dbSqlQ(tx, 'SELECT id FROM facts',[]);
+                haveModelsQ = new dbSqlQ(tx, 'SELECT id FROM models',[]);
             }
         );
         
@@ -1068,6 +1095,24 @@ Deck.prototype.realSync = function(resCallback){
                 }
                 reviewsSynched = result.rows.length;
                 sendData['reviewHistory'] = diff;
+                
+                var cardIds = [];
+                var factIds = [];
+                var modelIds = [];
+                var haveCards = haveCardsQ.result();
+                for(var i = 0; i < haveCards.rows.length; i++)
+                    cardIds[i] = haveCards.rows.item(i).id;
+                var haveFacts = haveFactsQ.result();
+                for(var i = 0; i < haveFacts.rows.length; i++)
+                    factIds[i] = haveFacts.rows.item(i).id;
+                var haveModels = haveModelsQ.result();
+                for(var i = 0; i < haveModels.rows.length; i++)
+                    modelIds[i] = haveModels.rows.item(i).id;
+                
+                sendData['cardIds'] = cardIds;
+                sendData['factIds'] = factIds;
+                sendData['modelIds'] = modelIds;
+                
                 sendData['method'] = 'realsync';
                 sendData['syncName'] = self.syncName;
                 
@@ -1107,32 +1152,45 @@ Deck.prototype.realSync = function(resCallback){
                                     updatesDone += updates['numUpdates'];
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
-                                        requestNext();
+                                        //requestNext();
                                     }
                                     
                                     self.tables.each(
                                         function(table) {
                                             // Apply updates
-                                            anki_log(table + ' modified ' + updates[table]['modified'].length + ' added ' + updates[table]['added'].length);
+                                            anki_log(table + ' removed ' + updates[table]['removed'].length + ' modified ' + updates[table]['modified'].length + ' added ' + updates[table]['added'].length);
+                                            
+                                            // Removals
+                                            updates[table]['removed'].each(
+                                                function(row){
+                                                    anki_log('Remove id ' + row)
+                                                    dbSql(tx, 'DELETE FROM ? WHERE id=?', [table, row]);
+                                                }
+                                            );
+                                            counts[table][0] += updates[table]['removed'].length;
+                                            
+                                            // Modifications
                                             {
                                                 var sql = json[table+'_sql_update'];
                                                 updates[table]['modified'].each(
                                                     function(row){
+                                                        anki_log('Update id ' + row[0])
                                                         dbSql(tx, sql, row);
-                                                        //anki_log('Update id ' + row[0])
                                                     }
-                                                );                                                    
-                                                counts[table][0] += updates[table]['modified'].length;
+                                                );
+                                                counts[table][1] += updates[table]['modified'].length;
                                             }
+                                            
+                                            // Additions
                                             {
                                                 var sql = json[table+'_sql_insert'];
                                                 updates[table]['added'].each(
                                                     function(row){
+                                                        anki_log('Add id ' + row[0])
                                                         dbSql(tx, sql, row);
-                                                        //anki_log('Add id ' + row[0])
                                                     }
                                                 );                                                   
-                                                counts[table][1] += updates[table]['added'].length;
+                                                counts[table][2] += updates[table]['added'].length;
                                             }
                                         }
                                     );
@@ -1147,7 +1205,7 @@ Deck.prototype.realSync = function(resCallback){
                                     
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
-                                        //requestNext();
+                                        requestNext();
                                     }
                                     else
                                     {
@@ -1172,85 +1230,6 @@ Deck.prototype.realSync = function(resCallback){
                         }
                         
                         applyNext(json['updates']);
-                        /*
-                        var requestUp = new Request.JSON({
-                        url: '/anki/sync.html',
-                        data: JSON.encode({'method':'nextsync', 'syncName':'self.syncName'}),
-                        onSuccess: function(json){
-                            if(json['error'] != 0) {
-                                anki_exception("Error syncing deck:" + json['exception']);
-                                resCallback();
-                                return;
-                            }
-                        }
-                        */
-                        
-                        /*
-                        var updates = json['updates']
-                        var syncCount = 0;
-                        var totalCount = 0;
-                        
-                        function countTable(table){
-                            totalCount += json[table+'_modified'].length;
-                            totalCount += json[table+'_added'].length;
-                        }
-                        function syncTable(table){
-                            var count = 0;
-                            dbTransaction(self.db,
-                                function(tx) {
-                                    // Apply updates
-                                    anki_log(table + ' modified ' + json[table+'_modified'].length + ' new ' + json[table+'_added'].length);
-                                    {
-                                        var sql = json[table+'_sql_update'];
-                                        json[table+'_modified'].each(
-                                            function(row){
-                                                dbSql(tx, sql, row);
-                                                syncCount+=1;
-                                                if((syncCount % 100) == 0)
-                                                    document.title = 'iAnki (dev) - Synched items ' + syncCount + ' of totalCount ' + totalCount;
-                                                //anki_log('Update id ' + row[0])
-                                            }
-                                        );
-                                        if(json[table+'_modified'].length > 0)
-                                            info += json[table+'_modified'].length+' '+table+' updated.\n';
-                                    }
-                                    {
-                                        var sql = json[table+'_sql_insert'];
-                                        json[table+'_added'].each(
-                                            function(row){
-                                                dbSql(tx, sql, row);
-                                                //anki_log('Add id ' + row[0])
-                                                syncCount+=1;
-                                                if((syncCount % 100) == 0)
-                                                    document.title = 'iAnki (dev) - Synched items ' + syncCount + ' of totalCount ' + totalCount;
-                                            }
-                                        );
-                                        if(json[table+'_added'].length > 0)
-                                            info += json[table+'_added'].length+' '+table+' added.\n';
-                                    }
-                                }
-                            );
-                        }
-                        
-                        self.tables.each( countTable(table));
-                        self.tables.each( syncTable(table));
-                        
-                        dbTransaction(self.db,
-                            function(tx) {
-                                //anki_log('Update syncTimes ' + json['lastSyncHost'] + ' ' + nowInSeconds());
-                                dbSql(tx, 'UPDATE syncTimes SET lastSyncHost=?, lastSyncClient=?',[json['lastSyncHost'], nowInSeconds()]);
-                            }
-                        );
-                        
-                        dbTransaction(self.db,
-                            function(tx) {
-                                alert(info);
-                                self.loadDeck();
-                                resCallback();
-                                $('syncDeck').disabled = false;
-                            }
-                        );
-                        */
                     },
                     onFailure: function(){
                         alert('Sync failed.');
@@ -1352,7 +1331,8 @@ Deck.prototype.initialize = function(){
 								"failedCardMax" INTEGER NOT NULL,  \
 								"newCardsPerDay" INTEGER NOT NULL,  \
 								"sessionRepLimit" INTEGER NOT NULL,  \
-								"sessionTimeLimit" INTEGER NOT NULL  \
+								"sessionTimeLimit" INTEGER NOT NULL,  \
+                                PRIMARY KEY (id) \
 								)');
 				dbSql(tx,'CREATE TABLE IF NOT EXISTS models ( \
 								id TEXT NOT NULL, \
@@ -1364,7 +1344,8 @@ Deck.prototype.initialize = function(){
 								description TEXT NOT NULL, \
 								features TEXT NOT NULL, \
 								spacing NUMERIC(10, 2) NOT NULL, \
-								"initialSpacing" NUMERIC(10, 2) NOT NULL \
+								"initialSpacing" NUMERIC(10, 2) NOT NULL, \
+                                PRIMARY KEY (id) \
 								)');
 				dbSql(tx, 'CREATE TABLE IF NOT EXISTS facts ( \
 								id TEXT NOT NULL,  \
@@ -1373,7 +1354,8 @@ Deck.prototype.initialize = function(){
 								modified NUMERIC(10, 2) NOT NULL,  \
 								tags TEXT NOT NULL,  \
 								"spaceUntil" NUMERIC(10, 2) NOT NULL,  \
-								"lastCardId" TEXT  \
+								"lastCardId" TEXT,  \
+                                PRIMARY KEY (id) \
 								)');
 				dbSql(tx,'CREATE TABLE IF NOT EXISTS cards ( \
 								id TEXT NOT NULL,  \
@@ -1413,7 +1395,8 @@ Deck.prototype.initialize = function(){
 								"relativeDelay" NUMERIC(10, 2) NOT NULL,  \
 								"isDue" BOOLEAN NOT NULL,  \
 								type INTEGER NOT NULL,  \
-								"combinedDue" INTEGER NOT NULL  \
+								"combinedDue" INTEGER NOT NULL,  \
+                                PRIMARY KEY (id) \
 								)');
 				dbSql(tx, 'CREATE TABLE IF NOT EXISTS "reviewHistory" ( \
 								id INTEGER NOT NULL,  \
