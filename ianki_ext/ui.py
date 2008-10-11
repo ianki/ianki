@@ -103,15 +103,19 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.stopButton = QtGui.QPushButton(self)
         self.stopButton.setText(_("Stop"))
         self.stopButton.setEnabled(False)
+        self.closeButton = QtGui.QPushButton(self)
+        self.closeButton.setText(_("Close"))
         self.vboxlayout.addWidget(self.startButton)
         self.vboxlayout.addWidget(self.stopButton)
+        self.vboxlayout.addWidget(self.closeButton)
         
         self.logText = QtGui.QTextEdit(self)
         self.logText.setReadOnly(True)
         self.vboxlayout.addWidget(self.logText)
         
         self.connect(self.startButton, QtCore.SIGNAL("clicked()"), self.startClicked)
-        self.connect(self.stopButton, QtCore.SIGNAL("clicked()"), self.stopClicked)        
+        self.connect(self.stopButton, QtCore.SIGNAL("clicked()"), self.stopClicked)
+        self.connect(self.closeButton, QtCore.SIGNAL("clicked()"), self.closeClicked)        
         self.exec_()
         
         # Reopen after sync finished.
@@ -129,6 +133,11 @@ class IAnkiServerDialog(QtGui.QDialog):
         if self.server:
             self.stopClicked()
         QtGui.QDialog.closeEvent(self, evt)
+        
+    def reject(self):
+        if self.server:
+            self.stopClicked()
+        QtGui.QDialog.reject(self)
         
     def startClicked(self):
         ip = str(self.ipEdit.text())
@@ -158,6 +167,9 @@ class IAnkiServerDialog(QtGui.QDialog):
         queryRunner = None
         self.startButton.setEnabled(True)
         self.settingsBox.setEnabled(True)
+        
+    def closeClicked(self):
+        self.close()
     
     def runProc(self, threadedProc):
         try:

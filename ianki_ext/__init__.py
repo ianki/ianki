@@ -13,7 +13,7 @@ import os
 import sys
 import time
 
-import pretty
+#import pretty
 #reload( sys.modules['ianki_ext.pretty'] )
 
 from web.SimpleHTTPServer import SimpleHTTPRequestHandler 
@@ -269,8 +269,8 @@ class anki_sync:
         json['exception'] = 'Unset'
         try:
             data = simplejson.loads(web.data())
-            print >> sys.stderr, "request"
-            pretty.pretty(data)
+            #print >> sys.stderr, "request"
+            #pretty.pretty(data)
             try:
                 if data['method'] == 'getdeck':
                     json['deck'] = ui.ankiQt.syncName
@@ -321,10 +321,16 @@ class anki_sync:
                         maxCards = 400
                         pickCards = deck.s.all('SELECT %s FROM cards WHERE \
                                             type in (0,1) AND combinedDue < (strftime("%%s", "now") + 172800) AND priority != 0 \
-                                            ORDER BY type, combinedDue, priority LIMIT %d' % (getFieldList(tables['cards']), maxCards))
-                        pickCards += deck.s.all('SELECT %s FROM cards WHERE \
-                                            type = 2 \
-                                            ORDER BY priority, combinedDue LIMIT %d' % (getFieldList(tables['cards']), maxCards - len(pickCards)))
+                                            ORDER BY combinedDue, type, priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards))
+                        
+                        if deck.newCardOrder == 0: # random
+                            pickCards += deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 2, factId, ordinal \
+                                                ORDER BY priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards - len(pickCards)))
+                        else: # ordered
+                            pickCards += deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 2 \
+                                                ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - len(pickCards)))
                         
                         print >> sys.stderr, 'Sync', len(pickCards)
                         
@@ -385,7 +391,7 @@ class anki_sync:
                             else:
                                 updateModels[1].append( procRow(modelFields, model, False) ) # Add
                         
-                        # Mark the remaining items on for removal
+                        # Mark the remaining items for removal
                         for x in haveCards:
                             updateCards[2].append(str(x))
                         for x in haveFacts:
@@ -431,8 +437,8 @@ class anki_sync:
             json['exception'] = str(e)
             print >> sys.stderr, "Exception", e
             ui.logMsg('There were errors during sync.')
-        print >> sys.stderr, "response"
-        pretty.pretty(json)
+        #print >> sys.stderr, "response"
+        #pretty.pretty(json)
         res = simplejson.dumps(json, ensure_ascii=False)
         web.output(res)
     def GET(self):

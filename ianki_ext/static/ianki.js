@@ -1038,8 +1038,9 @@ Deck.prototype.realSync = function(resCallback){
             if(reviewsSynched > 0)
                 info += '' + reviewsSynched + ' reviews synched\n';
             self.tables.each( function(table) {
-                if(counts[table][0] > 0)
-                    info += '' + counts[table][0] + ' ' + table + ' removed.\n';
+                // This removal message is a bit confusing, because cards are removed simply for not being due soon.
+                //if(counts[table][0] > 0)
+                //    info += '' + counts[table][0] + ' ' + table + ' removed.\n';
                 if(counts[table][1] > 0)
                     info += '' + counts[table][1] + ' ' + table + ' updated.\n';
                 if(counts[table][2] > 0)
@@ -1164,7 +1165,7 @@ Deck.prototype.realSync = function(resCallback){
                                             updates[table]['removed'].each(
                                                 function(row){
                                                     anki_log('Remove id ' + row)
-                                                    dbSql(tx, 'DELETE FROM ? WHERE id=?', [table, row]);
+                                                    dbSql(tx, 'DELETE FROM '+table+' WHERE id=?', [row]);
                                                 }
                                             );
                                             counts[table][0] += updates[table]['removed'].length;
