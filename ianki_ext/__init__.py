@@ -6,7 +6,7 @@ This is the web server setup of the iAnki plugin for Anki.
 
 """
 
-__version__ = "0.1"
+__version__ = "0.1b"
 __all__ = []
 
 import os

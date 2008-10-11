@@ -1,5 +1,7 @@
 // License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
+var iankiVersion = 'iAnki (0.1b)';
+var versionTitle = iankiVersion + ' - ';
 var autoKill = 0;
 var autoSync = 0;
 var iAnki;
@@ -404,7 +406,7 @@ Deck.prototype.getNextCard = function(resCallback){
 	self.markExpiredCardsDue();
     self.getCounts(
         function(a, b, c) {
-            document.title = 'iAnki (beta) - Remaining '+a+' '+b+' '+c;
+            document.title = versionTitle + 'Remaining '+a+' '+b+' '+c;
         }
     );
 	dbTransaction(self.db,
@@ -944,7 +946,7 @@ Deck.prototype.nextCard = function() {
                 self.currCard.fuzz = getRandomArbitary(0.95, 1.05);
                 self.currCard.startTime = nowInSeconds();
                 
-                iAnki.setTitle('iAnki - ' + self.syncName);
+                iAnki.setTitle(versionTitle + self.syncName);
                 iAnki.setMode($('reviewMode'));
 			}
 			else {
@@ -959,7 +961,7 @@ Deck.prototype.nextCard = function() {
                 
                 dbTransaction(self.db,
                     function(tx){
-                        iAnki.setTitle('iAnki - Welcome');
+                        iAnki.setTitle(versionTitle+'Welcome');
                         if(nextReviewQ.result().rows.length > 0) {
                             var dueIn = Math.max(0, nextReviewQ.result().rows.item(0)['min(combinedDue)'] - nowInSeconds());
                             iAnki.setInfo('No reviews to do at this time.<br>The next review will be in ' +
@@ -1023,7 +1025,7 @@ Deck.prototype.realSync = function(resCallback){
     try {
         var self = this;
         anki_log("Deck.realSync " + self.syncName);
-        iAnki.setInfo('iAnki - Syncing ' + self.syncName + '...');
+        iAnki.setInfo('Synching ' + self.syncName + '...');
         iAnki.setMode($('infoMode'));
         var sendData = {};
                 
@@ -1210,7 +1212,7 @@ Deck.prototype.realSync = function(resCallback){
                                 },
                                 function() {
                                     //updatesDone += updates['numUpdates'];
-                                    document.title = 'iAnki (beta) - Synched ' + updatesDone + '/' + numUpdates + ' items';
+                                    document.title = versionTitle + 'Synched ' + updatesDone + '/' + numUpdates + ' items';
                                     
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
@@ -1539,14 +1541,14 @@ IAnki.prototype.setMode = function(mode){
     this.currMode.style.display = 'block';
     
     if(this.currMode != $('reviewMode'))
-        document.title = 'iAnki (beta)';
+        document.title = iankiVersion;
 }
 
 IAnki.prototype.initialize = function() {	
     try {
 	var self = this;
 	self.currMode = $('infoMode');
-        self.setTitle('iAnki - Welcome');
+        self.setTitle(versionTitle + 'Welcome');
 	self.setInfo('Initializing...');
 	self.setMode($('infoMode'));
 	
@@ -1616,7 +1618,7 @@ IAnki.prototype.initialize = function() {
                 }
                 else {
                     anki_log("No deck is selected.");
-                    self.setTitle('iAnki - Welcome');
+                    self.setTitle(versionTitle + 'Welcome');
                     self.setInfo('There are no decks.');
                     self.setMode($('infoMode'));
                 }
@@ -1639,7 +1641,7 @@ IAnki.prototype.syncDeck = function(mode){
     try {
         var self = this;
         $('syncDeck').disabled = true;
-        iAnki.setInfo('iAnki - Syncing...');
+        iAnki.setInfo('Syncing...');
         iAnki.setMode($('infoMode'));
         
         anki_log("Fetching deck info.")
@@ -1816,11 +1818,11 @@ IAnki.prototype.chooseDeck = function(really){
                     
                     $('deckTable').innerHTML = rows;
                     
-                    iAnki.setTitle('iAnki');
+                    iAnki.setTitle(iankiVersion);
                     iAnki.setMode($('changeDeckMode'));
                 }
                 else {
-                    iAnki.setTitle('iAnki - Welcome');
+                    iAnki.setTitle(versionTitle+'Welcome');
                     iAnki.setInfo('There are no decks.');
                     iAnki.setMode($('infoMode'));
                 }

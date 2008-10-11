@@ -1,5 +1,7 @@
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
+__version__ = "0.1b"
+
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
 from ankiqt.forms.main import Ui_MainWindow
@@ -67,7 +69,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         deckQueryRunner = self
         
         self.setObjectName("iAnki Server")
-        self.setWindowTitle(_("iAnki Server"))
+        self.setWindowTitle(_("iAnki Server (%s)" % __version__))
         self.resize(260, 220)
         
         
