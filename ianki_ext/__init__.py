@@ -373,8 +373,7 @@ class anki_sync:
                             if deck.newCardOrder == 0: # random
                                 newCards = deck.s.all('SELECT %s FROM cards WHERE \
                                                     type = 2, factId, ordinal \
-                                                    ORDER BY priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
-                                
+                                                    ORDER BY priority desc, factId, ordinal LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
                             else: # ordered
                                 newCards = deck.s.all('SELECT %s FROM cards WHERE \
                                                     type = 2 \
@@ -386,7 +385,7 @@ class anki_sync:
                                     pickCards.append(c)
                                     gotCards += 1
                             
-                        #print >> sys.stderr, 'Sync', len(pickCards)
+                        print >> sys.stderr, 'Sync', len(pickCards)
                         
                         haveCards = set()
                         for i in data['cardIds']:

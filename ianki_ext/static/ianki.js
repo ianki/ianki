@@ -404,7 +404,7 @@ Deck.prototype.getNextCard = function(resCallback){
 	self.markExpiredCardsDue();
     self.getCounts(
         function(a, b, c) {
-            document.title = 'iAnki (dev) - Remaining '+a+' '+b+' '+c;
+            document.title = 'iAnki (beta) - Remaining '+a+' '+b+' '+c;
         }
     );
 	dbTransaction(self.db,
@@ -1210,7 +1210,7 @@ Deck.prototype.realSync = function(resCallback){
                                 },
                                 function() {
                                     //updatesDone += updates['numUpdates'];
-                                    document.title = 'iAnki (dev) - Synched ' + updatesDone + '/' + numUpdates + ' items';
+                                    document.title = 'iAnki (beta) - Synched ' + updatesDone + '/' + numUpdates + ' items';
                                     
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
@@ -1539,7 +1539,7 @@ IAnki.prototype.setMode = function(mode){
     this.currMode.style.display = 'block';
     
     if(this.currMode != $('reviewMode'))
-        document.title = 'iAnki (dev)';
+        document.title = 'iAnki (beta)';
 }
 
 IAnki.prototype.initialize = function() {	
