@@ -279,6 +279,7 @@ class anki_sync:
                     ui.logMsg('Sync started for deck ' + data['syncName'])
                     deck = DeckStorage.Deck(ui.ankiQt.deckPath, rebuild=False)
                     try:
+                        deck.rebuildQueue()
                         # Apply client updates
                         if len(data['reviewHistory']) > 0:
                             ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
@@ -319,6 +320,8 @@ class anki_sync:
                         
                         # Get cards to review for the next 2 days, up to maxCards
                         maxCards = 400
+                        #pickCardIds = {}
+                        #for hour in range(0, 48):
                         pickCards = deck.s.all('SELECT %s FROM cards WHERE \
                                             type in (0,1) AND combinedDue < (strftime("%%s", "now") + 172800) AND priority != 0 \
                                             ORDER BY combinedDue, type, priority desc LIMIT %d' % (getFieldList(tables['cards']), maxCards))

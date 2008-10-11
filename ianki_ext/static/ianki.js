@@ -137,7 +137,7 @@ function dbSql(tx, sql, args, callback1, callback2){
 			},
 			function(tx, error){
 				try {
-					anki_exception("dbSql error - " + sql + " | " + error.message);
+					anki_exception("dbSql error - " + sql + "<br> -> " + error.message + "<br> -> " + args);
 					if(callback2)
 						callback2(tx, error);
 				}
@@ -587,7 +587,7 @@ Deck.prototype.answerCard = function(ease){
 	    card.due = self.nextDue(card, ease, oldState);
 	    card.isDue = 0;
 	    card.lastFactor = card.factor;
-	    this.updateFactor(card, ease);
+	    self.updateFactor(card, ease);
 	    card.spaceUntil = 0
 		card.combinedDue = card.due;
 			
@@ -893,6 +893,10 @@ Deck.prototype.answerCard = function(ease){
 		dbTransaction(self.db,
 			function(tx){
                 // Write card history
+                var hist = [card.id, card.lastInterval, card.nextInterval, ease, lastDelay, 
+							 card.lastFactor, card.factor, card.reps, card.thinkingTime, card.yesCount, card.noCount,
+							 time];
+                
 				dbSql(tx,	'insert into reviewHistory \
 							(cardId, lastInterval, nextInterval, ease, delay, lastFactor, \
 							nextFactor, reps, thinkingTime, yesCount, noCount, time) \
@@ -900,9 +904,7 @@ Deck.prototype.answerCard = function(ease){
 							?, ?, ?, ?, ?, \
 							?, ?, ?, ?, ?, ?, \
 							?)',
-							[card.id, card.lastInterval, card.nextInterval, ease, lastDelay, 
-							 card.lastFactor, card.factor, card.reps, card.thinkingTime, card.yesCount, card.noCount,
-							 time]
+							hist
 							);
                 
                 // Update modified time on this deck
@@ -978,9 +980,11 @@ Deck.prototype.loadDeck = function() {
     anki_log("Deck.loadDeck");
     var self = this;
     var deckQ;
+    var averageFactorQ;
     dbTransaction(self.db,
         function(tx) {
             deckQ = new dbSqlQ(tx, 'SELECT * FROM decks LIMIT 1');
+            averageFactorQ = new dbSqlQ(tx, 'select avg(factor) from cards where reps > 0');
         }
     );
     
@@ -1007,6 +1011,10 @@ Deck.prototype.loadDeck = function() {
                 // when to show new cards
                 self.newCardSpacing = deck.newCardSpacing;
             }
+            if(averageFactorQ.result().rows.length > 0)
+                self.averageFactor = averageFactorQ.result().rows.item(0)['avg(factor)'];
+            else
+                self.averageFactor = self.initialFactor;
         }
     );
 }
