@@ -386,7 +386,7 @@ class anki_sync:
                                     pickCards.append(c)
                                     gotCards += 1
                             
-                        print >> sys.stderr, 'Sync', len(pickCards)
+                        #print >> sys.stderr, 'Sync', len(pickCards)
                         
                         haveCards = set()
                         for i in data['cardIds']:
