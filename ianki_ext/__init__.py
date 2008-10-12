@@ -39,7 +39,7 @@ def unload():
 
 import web
 import simplejson
-from anki import DeckStorage
+from anki import DeckStorage, cards
 from anki.stats import dailyStats, globalStats
 
 urls = (
@@ -285,39 +285,45 @@ class anki_sync:
                         # Apply client updates
                         if len(data['reviewHistory']) > 0:
                             ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
+                            timeSave = time.time
+                            thinkingTimeSave = cards.Card.thinkingTime
                             numApplied = 0
+                            numDropped = 0
                             try:
-                                for review in data['reviewHistory']:
-                                    #print >> sys.stderr, 'applyReview', review
-                                    def timeOverride():
+                                def timeOverride():
                                         return review['time']
-                                    def thinkingTimeOverride():
-                                        return review['thinkingTime']
-
-                                    timeSave = time.time
-                                    time.time = timeOverride
+                                def thinkingTimeOverride(self):
+                                    return review['thinkingTime']
+                                
+                                try:
+                                    deck._globalStats = globalStats(deck)
+                                    deck._dailyStats = dailyStats(deck)
+                                except:
+                                    deck._globalStats = globalStats(deck.s)
+                                    deck._dailyStats = dailyStats(deck.s)
+                                
+                                time.time = timeOverride
+                                cards.Card.thinkingTime = thinkingTimeOverride
+                                
+                                for review in data['reviewHistory']:
                                     try:
                                         card = deck.cardFromId(int(review['cardId']))
-                                        thinkingTimeSave = card.thinkingTime
-                                        card.thinkingTime = thinkingTimeOverride
-                                        try:
-                                            numApplied += 1
-                                            try:
-                                                deck._globalStats = globalStats(deck)
-                                                deck._dailyStats = dailyStats(deck)
-                                            except:
-                                                deck._globalStats = globalStats(deck.s)
-                                                deck._dailyStats = dailyStats(deck.s)
+                                        if review['reps'] == card.reps + 1: # Apply only in order reps
                                             deck.answerCard(card, review['ease'])
-                                        finally:
-                                            card.thinkingTime = thinkingTimeSave
-                                    finally:
-                                        time.time = timeSave
+                                            numApplied += 1
+                                        else:
+                                            numDropped += 1
+                                    except:
+                                        numDropped += 1
                             finally:
+                                time.time = timeSave
+                                cards.Card.thinkingTime = thinkingTimeSave
                                 if numApplied > 0:
                                     # Update anything that may have changed
                                     deck.modified = time.time()
                                     deck.save()
+                                if numDropped > 0:
+                                    ui.logMsg(' Dropped %d stale reviews' % numDropped)
 
                         # Send host updates
                         json['lastSyncHost'] = time.time()

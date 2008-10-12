@@ -1091,7 +1091,7 @@ Deck.prototype.realSync = function(resCallback){
                 sendData['lastSyncClient'] = lastSyncClient;
                 
                 // Get history modified since last client sync time
-                modifiedQ = new dbSqlQ(tx, 'SELECT cardId,time,ease,thinkingTime FROM reviewHistory WHERE time > ?',[lastSyncClient]);
+                modifiedQ = new dbSqlQ(tx, 'SELECT * FROM reviewHistory WHERE time > ?',[lastSyncClient]);
                 haveCardsQ = new dbSqlQ(tx, 'SELECT id FROM cards',[]);
                 haveFactsQ = new dbSqlQ(tx, 'SELECT id FROM facts',[]);
                 haveModelsQ = new dbSqlQ(tx, 'SELECT id FROM models',[]);
@@ -1139,6 +1139,13 @@ Deck.prototype.realSync = function(resCallback){
                             resCallback();
                             return;
                         }
+                        
+                        // Delete old reviewHistory
+                        dbTransaction(self.db,
+                            function(tx) {
+                                dbSql(tx, 'DELETE FROM reviewHistory',[]);
+                            }
+                        );
                         
                         var numUpdates = json['numUpdates']
                         var updatesDone = 0;
