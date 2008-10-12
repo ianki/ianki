@@ -1,6 +1,6 @@
 // Copyright (C) 2008 Victor Miura
 // License: GNU GPL, version 3 or later; 
-http://www.gnu.org/copyleft/gpl.html
+// http://www.gnu.org/copyleft/gpl.html
 var iankiVersion = 'iAnki (0.1b2)';
 var versionTitle = iankiVersion + ' - ';
 var autoKill = 0;

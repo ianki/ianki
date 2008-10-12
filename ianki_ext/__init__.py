@@ -17,14 +17,14 @@ import time
 #import pretty
 #reload( sys.modules['ianki_ext.pretty'] )
 
-from web.SimpleHTTPServer import SimpleHTTPRequestHandler 
+from web.SimpleHTTPServer import SimpleHTTPRequestHandler
 
 # Direct the server to the plugin directory
 iankiPath = os.path.dirname(__file__)
 SimpleHTTPRequestHandler.baseServerPath = iankiPath
 
 # Hack to get around bug in SimpleHTTPServer file handling
-send_head = SimpleHTTPRequestHandler.send_head 
+send_head = SimpleHTTPRequestHandler.send_head
 
 def new_send_head(*a, **kw):
     print 'new_send_head', a, kw
@@ -226,7 +226,7 @@ def countUpdates():
         ret += len(update[t]['modified'])
         ret += len(update[t]['added'])
     return ret
-        
+
 def getUpdate(maxCount):
     ret = {}
     ret['numUpdates'] = 0
@@ -293,7 +293,7 @@ class anki_sync:
                                         return review['time']
                                     def thinkingTimeOverride():
                                         return review['thinkingTime']
-                                    
+
                                     timeSave = time.time
                                     time.time = timeOverride
                                     try:
@@ -314,12 +314,12 @@ class anki_sync:
                                     # Update anything that may have changed
                                     deck.modified = time.time()
                                     deck.save()
-                        
+
                         # Send host updates
                         json['lastSyncHost'] = time.time()
                         global update
                         update = {}
-                        
+
                         cardFields = tables['cards']
                         cardIdIndex = cardFields.index('id')
                         cardFactIdIndex = cardFields.index('factId')
@@ -331,7 +331,7 @@ class anki_sync:
                         modelFields = tables['models']
                         modelIdIndex = modelFields.index('id')
                         modelModifiedIndex = modelFields.index('modified')
-                        
+
                         # Get cards to review for the next 2 days, up to maxCards
                         maxCards = 400
                         gotCards = 0
@@ -342,34 +342,34 @@ class anki_sync:
                         for hour in range(0, 48):
                             if gotCards == maxCards:
                                 break
-                            
+
                             # First pick due failed cards
                             failedCards = deck.s.all('SELECT %s FROM cards WHERE \
                                                 type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
                                                 ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
-                            
+
                             for c in failedCards:
                                 cardId = c[cardIdIndex]
                                 if cardId not in pickCardsIds:
                                     pickCardsIds.add(cardId)
                                     pickCards.append(c)
                                     gotCards += 1
-                                    
+
                             # Next pick due review cards
                             reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
                                                 type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
                                                 ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
-                            
+
                             for c in reviewCards:
                                 cardId = c[cardIdIndex]
                                 if cardId not in pickCardsIds:
                                     pickCardsIds.add(cardId)
                                     pickCards.append(c)
                                     gotCards += 1
-                            
+
                             prevTime = checkTime - 60
                             checkTime += 60 * 60
-                        
+
                         # Finally pick new cards
                         if gotCards < maxCards:
                             if deck.newCardOrder == 0: # random
@@ -386,9 +386,9 @@ class anki_sync:
                                     pickCardsIds.add(cardId)
                                     pickCards.append(c)
                                     gotCards += 1
-                            
+
                         #print >> sys.stderr, 'Sync', len(pickCards)
-                        
+
                         haveCards = set()
                         for i in data['cardIds']:
                             haveCards.add(int(i))
@@ -398,11 +398,11 @@ class anki_sync:
                         haveModels = set()
                         for i in data['modelIds']:
                             haveModels.add(int(i))
-                        
+
                         updateCards = [[],[],[]] # modify, add, remove
                         updateFacts = [[],[],[]] # modify, add, remove
                         updateModels = [[],[],[]] # modify, add, remove
-                                               
+
                         pickFacts = {}
                         for card in pickCards:
                             cardId = card[cardIdIndex]
@@ -413,7 +413,7 @@ class anki_sync:
                             else:
                                 updateCards[1].append( procRow(cardFields, card, False) ) # Add
                             pickFacts[card[cardFactIdIndex]] = None
-                        
+
                         pickModels = {}
                         for factId in pickFacts.keys():
                             fact = deck.s.first('SELECT %s FROM facts WHERE id=%d' % (getFieldList(factFields), factId))
@@ -424,7 +424,7 @@ class anki_sync:
                             else:
                                 updateFacts[1].append( procRow(factFields, fact, False) ) # Add
                             pickModels[fact[factModelIdIndex]] = None
-                        
+
                         for modelId in pickModels.keys():
                             model = deck.s.first('SELECT %s FROM models WHERE id=%d' % (getFieldList(modelFields), modelId))
                             if modelId in haveModels:
@@ -433,7 +433,7 @@ class anki_sync:
                                 haveModels.remove(modelId)
                             else:
                                 updateModels[1].append( procRow(modelFields, model, False) ) # Add
-                        
+
                         # Mark the remaining items for removal
                         for x in haveCards:
                             updateCards[2].append(str(x))
@@ -441,17 +441,17 @@ class anki_sync:
                             updateFacts[2].append(str(x))
                         for x in haveModels:
                             updateModels[2].append(str(x))
-                            
+
                         update['cards'] = {'modified': updateCards[0], 'added': updateCards[1], 'removed': updateCards[2]}
                         update['facts'] = {'modified': updateFacts[0], 'added': updateFacts[1], 'removed': updateFacts[2]}
                         update['models'] = {'modified': updateModels[0], 'added': updateModels[1], 'removed': updateModels[2]}
-                        
+
                         addedDeck = deck.s.all('SELECT %s FROM %s WHERE created > %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost']))
                         modifiedDeck = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost'], data['lastSyncHost']))
                         update['decks'] = { 'modified': [procRow(tables['decks'], x, True) for x in modifiedDeck],
                                             'added': [procRow(tables['decks'], x, False) for x in addedDeck],
                                             'removed': [] }
-                        
+
                         for t in tables.keys():
                             json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
                             json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
@@ -462,7 +462,7 @@ class anki_sync:
                     finally:
                         deck.save()
                         deck.close()
-                        
+
                     #ui.logMsg('Sync complete')
                 elif data['method'] == 'nextsync':
                     json['updates'] = getUpdate(200)

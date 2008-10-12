@@ -24,7 +24,7 @@ def pretty(obj, indent=0):
     else:
         nl = ''
         newIndent = 0
-            
+
     t = type(obj)
     if t in listTypes.keys():
         sys.stderr.write((' ' * indent) + listTypes[t][0] + nl)
@@ -34,7 +34,7 @@ def pretty(obj, indent=0):
                 sys.stderr.write(', ' + nl)
             pretty(i, newIndent)
             count += 1
-            
+
         sys.stderr.write(nl + (' ' * indent) + listTypes[t][1])
     elif t == dict:
         sys.stderr.write((' ' * indent) + '{' + nl)
