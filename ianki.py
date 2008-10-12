@@ -15,8 +15,8 @@ def Ui_MainWindow_setupUi(self, MainWindow):
     self.actionRunIAnki = QtGui.QAction(MainWindow)
     self.actionRunIAnki.setObjectName("actionRunIAnki")
     self.actionRunIAnki.setText(_("&iAnki Server"))
-    self.menuTools.addSeparator()
-    self.menuTools.addAction(self.actionRunIAnki)
+    self.menuPlugins.addSeparator()
+    self.menuPlugins.addAction(self.actionRunIAnki)
 
     def iankiWindow():
         ianki_ext.unload()
