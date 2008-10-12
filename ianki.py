@@ -1,5 +1,5 @@
-#import cgitb; cgitb.enable()
-#import sys
+# Copyright (C) 2008 Victor Miura
+# License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
 import sys
 import ianki_ext

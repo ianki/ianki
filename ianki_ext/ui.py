@@ -1,16 +1,19 @@
+# Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.1b"
+__version__ = "0.1b2"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
 from ankiqt.forms.main import Ui_MainWindow
 import web
+import sys
 
 ankiQt = None
 deckQueryRunner = None
 urls = None
 glob = None
+useGears = False
 
 class ThreadedProc:
     def __init__(self, proc, arg):
@@ -64,6 +67,8 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.config['ianki_ip'] = 'localhost'
         if 'ianki_port' not in self.config:
             self.config['ianki_port'] = '8000'
+        if 'ianki_useGears' not in self.config:
+            self.config['ianki_useGears'] = False
         
         global deckQueryRunner
         deckQueryRunner = self
@@ -99,6 +104,13 @@ class IAnkiServerDialog(QtGui.QDialog):
         
         self.settingsLayout.addLayout(self.iplayout)
         
+        self.useGears = QtGui.QCheckBox(self)
+        self.useGears.setObjectName("useGears")
+        self.useGears.setChecked(self.config['ianki_useGears'])
+        self.useGears.setText(_('Enable Gears'))
+        
+        self.settingsLayout.addWidget(self.useGears)
+        
         self.startButton = QtGui.QPushButton(self)
         self.startButton.setText(_("Start"))
         self.startButton.setDefault(True)
@@ -117,7 +129,8 @@ class IAnkiServerDialog(QtGui.QDialog):
         
         self.connect(self.startButton, QtCore.SIGNAL("clicked()"), self.startClicked)
         self.connect(self.stopButton, QtCore.SIGNAL("clicked()"), self.stopClicked)
-        self.connect(self.closeButton, QtCore.SIGNAL("clicked()"), self.closeClicked)        
+        self.connect(self.closeButton, QtCore.SIGNAL("clicked()"), self.closeClicked)
+        self.connect(self.useGears, QtCore.SIGNAL("clicked()"), self.useGearsChanged)        
         self.exec_()
         
         # Reopen after sync finished.
@@ -130,7 +143,12 @@ class IAnkiServerDialog(QtGui.QDialog):
             ankiQt.moveToState("noDeck")
         ankiQt.deckPath = None
         ankiQt = None
-        
+    
+    def useGearsChanged(self):
+        global useGears
+        useGears = self.useGears.isChecked()
+        self.config['ianki_useGears'] = useGears
+
     def closeEvent(self, evt):
         if self.server:
             self.stopClicked()

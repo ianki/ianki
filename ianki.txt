@@ -1,0 +1,7 @@
+# Copyright (C) 2008 Victor Miura
+# License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
+
+This is a plugin for the Anki spaced repetition system http://ichi2.net/anki/.
+
+This plugin creates an offline-enabled web based client for Anki, compatible with
+the HTTP5 client database API.

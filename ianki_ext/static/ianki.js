@@ -1,6 +1,7 @@
-// License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
-
-var iankiVersion = 'iAnki (0.1b)';
+// Copyright (C) 2008 Victor Miura
+// License: GNU GPL, version 3 or later; 
+http://www.gnu.org/copyleft/gpl.html
+var iankiVersion = 'iAnki (0.1b2)';
 var versionTitle = iankiVersion + ' - ';
 var autoKill = 0;
 var autoSync = 0;
@@ -84,7 +85,7 @@ function getRandomArbitary(min, max)
 }
 
 function dbOpen(name, version, desc, size){   
-    var db = openDatabase(name, version, desc, size);
+    var db = window.openDatabase(name, version, desc, size);
     if (!db)
         alert("Failed to open the database on disk.  This is probably because the version was bad or there is not enough space left in this domain's quota");
     else
@@ -212,7 +213,7 @@ var NEW_INTERVAL = 0.001;
 var NEW_CARDS_LAST = 1;
 var NEW_CARDS_DISTRIBUTE = 0;
 
-function Deck(syncName)
+function Deck(syncName, isNewDeck)
 {
     this.syncName = syncName
 	this.currCard = null;
@@ -241,7 +242,7 @@ function Deck(syncName)
 	// when to show new cards
 	this.newCardSpacing = NEW_CARDS_DISTRIBUTE;
     
-    this.initialize()
+    this.initialize(isNewDeck);
 }
 
 Deck.prototype.markExpiredCardsDue = function() {
@@ -930,7 +931,9 @@ Deck.prototype.answerCard = function(ease){
 }
 
 Deck.prototype.nextCard = function() {
-	self = this;
+    anki_log('Deck.nextCard');
+	var self = this;
+    anki_log('What the?');
 	//$(content).innerHTML = '';
 	//iAnki.currMode.style.display='none';
 	
@@ -1174,7 +1177,7 @@ Deck.prototype.realSync = function(resCallback){
                                             // Removals
                                             updates[table]['removed'].each(
                                                 function(row){
-                                                    anki_log('Remove id ' + row)
+                                                    //anki_log('Remove id ' + row)
                                                     dbSql(tx, 'DELETE FROM '+table+' WHERE id=?', [row]);
                                                 }
                                             );
@@ -1185,7 +1188,7 @@ Deck.prototype.realSync = function(resCallback){
                                                 var sql = json[table+'_sql_update'];
                                                 updates[table]['modified'].each(
                                                     function(row){
-                                                        anki_log('Update id ' + row[0])
+                                                        //anki_log('Update id ' + row[0])
                                                         dbSql(tx, sql, row);
                                                     }
                                                 );
@@ -1197,7 +1200,7 @@ Deck.prototype.realSync = function(resCallback){
                                                 var sql = json[table+'_sql_insert'];
                                                 updates[table]['added'].each(
                                                     function(row){
-                                                        anki_log('Add id ' + row[0])
+                                                        //anki_log('Add id ' + row[0])
                                                         dbSql(tx, sql, row);
                                                     }
                                                 );                                                   
@@ -1272,6 +1275,20 @@ Deck.prototype.eraseDeck = function(resCallback) {
         dbTransaction(self.db,
             function(tx)
             {
+                dbSql(tx,'DROP VIEW IF EXISTS acqCardsOrdered');
+				dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
+				dbSql(tx,'DROP VIEW IF EXISTS failedCardsNow');
+				dbSql(tx,'DROP VIEW IF EXISTS failedCards');
+				dbSql(tx,'DROP VIEW IF EXISTS failedCardsSoon');
+				dbSql(tx,'DROP VIEW IF EXISTS revCards');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_markExpired');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedIsDue');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedOrder');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newOrderedOrder');
+                dbSql(tx,'DROP INDEX IF EXISTS ix_cards_factId');
+                
                 dbSql(tx, 'DROP TABLE IF EXISTS syncTimes');
                 dbSql(tx, 'DROP TABLE IF EXISTS reviewHistory');
                 self.tables.each( function(table) { dbSql(tx, 'DROP TABLE IF EXISTS ' + table) });
@@ -1292,19 +1309,21 @@ Deck.prototype.eraseDeck = function(resCallback) {
     }
 }
 
-Deck.prototype.initialize = function(){
+Deck.prototype.initialize = function(isNewDeck){
 	var self = this;
 	try {
         anki_log('Init deck' + self.syncName);
-		self.db = dbOpen("iAnki "+self.syncName+" deck", "1.1", "iAnki "+self.syncName+" deck", 4000000);
+		self.db = dbOpen("iAnki-"+self.syncName+"-deck", "1.0", "iAnki "+self.syncName+" deck", 4000000);
         anki_log(' create tables');
+        
+        if(!self.db)
+            return;
+        if(isNewDeck || autoKill) {
+            self.eraseDeck(function() {});
+        }
 		dbTransaction(self.db,
 			function(tx)
 			{
-				if (autoKill) {
-					self.tables.each( function(table) { dbSql(tx, 'DROP TABLE IF EXISTS ' + table) });
-				}
-
                 dbSql(tx,'CREATE TABLE IF NOT EXISTS syncTimes ( \
 								id INTEGER NOT NULL,  \
 								lastSyncHost NUMERIC(10, 2) NOT NULL,  \
@@ -1560,7 +1579,7 @@ IAnki.prototype.initialize = function() {
         }
                 
         // Init deck index
-        self.dbBase = dbOpen('iAnki Settings', "1.1", "iAnki settings database", 100000);
+        self.dbBase = dbOpen('iAnki-Settings', "1.0", "iAnki settings database", 100000);
         
         var settingsQ;
 		dbTransaction(self.dbBase,
@@ -1598,6 +1617,7 @@ IAnki.prototype.initialize = function() {
 		);
         
         // Load global settings
+        var inDecksQ = null;
         dbTransaction(self.dbBase,
             function(tx)
             {
@@ -1609,11 +1629,22 @@ IAnki.prototype.initialize = function() {
                 }
                 else{
                     self.currentDeck = settingsQ.result().rows.item(0).currentDeck;
+                    inDecksQ = new dbSqlQ(tx, 'SELECT name FROM decks WHERE name = ?', [self.currentDeck]);
                 }
-                
+            }
+        );
+        
+        dbTransaction(self.dbBase,
+            function(tx)
+            {
                 if(self.currentDeck != '') {
+                    if(inDecksQ.result().rows.length == 0) {
+                        anki_log("Restoring lost deck " + self.currentDeck);
+                        dbSql(tx, 'INSERT INTO decks (name) values (?)', [self.currentDeck]);
+                    }
                     anki_log("Load current deck " + self.currentDeck);
-                    self.deck = new Deck(self.currentDeck);
+                    self.deck = new Deck(self.currentDeck, false);
+                    anki_log("Next card on " + self.currentDeck);
                     self.deck.nextCard()
                 }
                 else {
@@ -1674,9 +1705,11 @@ IAnki.prototype.syncDeck = function(mode){
                         function(tx)
                         {
                             anki_log("Check result");
+                            var isNewDeck = false;
                             if(deckQ.result().rows.length == 0) {
                                 anki_log("Creating deck: " + syncName + " on client");
                                 dbSql(tx, 'INSERT INTO decks (name) values (?)', [syncName]);
+                                isNewDeck = true;
                             }
                             else {
                                 anki_log("Syncing existing deck: " + syncName + " on client");
@@ -1685,7 +1718,7 @@ IAnki.prototype.syncDeck = function(mode){
                             // Set this deck as the current deck, and sync the deck
                             self.currentDeck = syncName;
                             dbSql(tx,'UPDATE settings SET currentDeck=?', [self.currentDeck]);
-                            self.deck = new Deck(syncName);
+                            self.deck = new Deck(syncName, isNewDeck);
                             
                             if(mode == 0){
                                 self.deck.sync(
@@ -1742,7 +1775,7 @@ IAnki.prototype.setDeck = function(name) {
         dbTransaction(self.dbBase,
             function(tx)
             {
-                self.deck = new Deck(name);
+                self.deck = new Deck(name, false);
                 self.deck.nextCard();
             }
         );
@@ -1757,15 +1790,17 @@ IAnki.prototype.deleteDeck = function(name) {
         var self = this;
         anki_log('IAnki.deleteDeck ' + name);
         self.currentDeck = name;
-        self.deck = new Deck(name);
+        self.deck = new Deck(name, false);
         self.deck.eraseDeck(
             function(){
                 self.deck = null;
+                self.currentDeck = '';
                 dbTransaction(self.dbBase,
                     function(tx)
                     {
                         dbSql(tx, 'DELETE FROM decks WHERE name = ?', [name])
-                        dbSql(tx, 'UPDATE settings SET currentDeck = ? WHERE currentDeck = ?', ['', name])
+                        dbSql(tx, 'UPDATE settings SET currentDeck = ?', [''])
+                        
                     }
                 );
                 dbTransaction(self.dbBase,
@@ -1798,11 +1833,8 @@ IAnki.prototype.chooseDeck = function(really){
         dbTransaction(self.dbBase,
             function(tx)
             {
-                var rows = '';
-                
-                
+                var rows = "<table style='font-size: 20px; margin: 16px'>";
                 var result = deckQ.result();
-                
                 if(result.rows.length > 0){
                     for(var d = 0; d < result.rows.length; d++){
                         var name = result.rows.item(d).name;
@@ -1815,9 +1847,8 @@ IAnki.prototype.chooseDeck = function(really){
                         }
                         rows += "</td></tr>";
                     }
-                    
+                    rows += '</table>';
                     $('deckTable').innerHTML = rows;
-                    
                     iAnki.setTitle(iankiVersion);
                     iAnki.setMode($('changeDeckMode'));
                 }
@@ -1835,45 +1866,22 @@ IAnki.prototype.chooseDeck = function(really){
 }
 
 try {
-    iAnki = new IAnki(); // The global IAnki class
-    
-    addEventListener('load',
-        function(event){
-            iAnki.initialize();
-            
-            // Save this for another day
-            /*
-            addEventListener('onkeyup',
-                function(key){
-                    anki_exception('onkeyup exception:' + e);
-                    try {
-                        if(iAnki.currMode == $('reviewMode')) {
-                            if($('showAnswer').style.display=='block'){
-                                if (key.key().code == 13 ||
-                                    key.key().code == 32) {
-                                    iAnki.deck.showAnswer();
-                                }
-                            }
-                            else if($('answerSide').style.display=='block'){
-                                if (key.key().code >= 49 && key.key().code <= 53){
-                                    iAnki.deck.answerCard(key.key().code-49);
-                                }
-                            }
-                        }
-                    }
-                    catch (e) {
-                        anki_exception('onkeyup exception:' + e);
-                    }
-                },
-                false
-            );
-            */
-        },
-        false
-    );
+    if(!window.openDatabase) {
+        iAnki.setInfo('Try enabling Gears support.');
+        iAnki.setMode($('infoMode'));
+    }
+    else {
+        window.addEvent('domready',
+            function(event){
+                iAnki = new IAnki(); // The global IAnki class
+                iAnki.initialize();
+            },
+            false
+        );
+    }
 } 
 catch (e) {
-    anki_exception('Global exception:' + e);
+    anki_exception('\nAn exception ocurred\nTry enabling Gears support.');
 }
 
 /*
@@ -1881,5 +1889,5 @@ catch (e) {
     <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
     <meta name="apple-mobile-web-app-capable" content="yes" />.
     <meta names="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    //padding: 10px; width: 140px; height: 80px; margin: 16px;
 */
-//padding: 10px; width: 140px; height: 80px; margin: 16px;

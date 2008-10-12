@@ -1,3 +1,4 @@
+# Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
 """iAnki web server
@@ -6,7 +7,7 @@ This is the web server setup of the iAnki plugin for Anki.
 
 """
 
-__version__ = "0.1b"
+__version__ = "0.1b2"
 __all__ = []
 
 import os
@@ -50,7 +51,8 @@ render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned
 
 class index:
     def GET(self):
-        web.output(render.ianki())
+        joose = ui.useGears
+        web.output(render.ianki(joose))
 
 tables = {}
 tables['decks'] = [ 'id',

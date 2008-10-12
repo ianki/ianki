@@ -1,3 +1,4 @@
+$def with (joose)
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html manifest="/static/cache-manifest">
     <head>
@@ -8,8 +9,11 @@
         <link rel="shorcut icon" href="/static/favicon.ico"/>
         <link rel="stylesheet" type="text/css" href="/static/base.css">
 
-        <script type="text/javascript" src="/static/mootools.js"></script>
-        <script type="text/javascript" src="/static/ianki.js"></script>
+$if joose:
+    <script type="text/javascript" src="/static/joose.mini.js"></script>
+    <script type="text/javascript" src="/static/orm_async.js"></script>
+<script type="text/javascript" src="/static/mootools.js"></script>
+<script type="text/javascript" src="/static/ianki.js"></script>
 
     </head>
     <body>
@@ -46,8 +50,7 @@
     
     <div id='changeDeckMode' style='display:none' style="margin: 16px">
         <div id="info" style="font-size: 32px; margin: 16px">Change deck</div>
-        <table id='deckTable' style='font-size: 20px; margin: 16px'>
-        </table>
+        <div id="deckTable"></div>
     </div>
     
     <div id="padding" style="font-size: 40x; ">&nbsp</div>

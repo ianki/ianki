@@ -1,3 +1,4 @@
+# Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 '''Module for printing nested structures in a more readable manner.'''
 
