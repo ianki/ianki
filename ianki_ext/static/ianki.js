@@ -444,7 +444,7 @@ Deck.prototype.nextDue = function(card, ease, oldState){
 }
 
 Deck.prototype._adjustedDelay = function(card) {
-    if(self.cardIsNew(card))
+    if(this.cardIsNew(card))
         return 0;
     
     return Math.max(0, (nowInSeconds() - card.due) / 86400.0);
