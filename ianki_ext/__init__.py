@@ -302,8 +302,8 @@ class anki_sync:
                                         card.thinkingTime = thinkingTimeOverride
                                         try:
                                             numApplied += 1
-                                            deck._globalStats = globalStats(deck.s)
-                                            deck._dailyStats = dailyStats(deck.s)
+                                            deck._globalStats = globalStats(deck)
+                                            deck._dailyStats = dailyStats(deck)
                                             deck.answerCard(card, review['ease'])
                                         finally:
                                             card.thinkingTime = thinkingTimeSave
