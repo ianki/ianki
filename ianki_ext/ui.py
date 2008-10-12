@@ -69,6 +69,8 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.config['ianki_port'] = '8000'
         if 'ianki_useGears' not in self.config:
             self.config['ianki_useGears'] = False
+        global useGears
+        useGears = self.config['ianki_useGears']
         
         global deckQueryRunner
         deckQueryRunner = self
