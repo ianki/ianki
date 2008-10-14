@@ -1,13 +1,18 @@
 $def with (joose)
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html manifest="/static/cache-manifest">
+<html manifest="cache.manifest">
     <head>
         <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
+        <!--meta name="apple-mobile-web-app-capable" content="yes" /-->.
+        <!--meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /-->
         
-        <title>iAnki - loading...</title>
+        <title>iAnki (0.1b3) - loading...</title>
+        
+        <link rel="stylesheet" type="text/css" href="/static/base.css">
         
         <link rel="shorcut icon" href="/static/favicon.ico"/>
-        <link rel="stylesheet" type="text/css" href="/static/base.css">
+        <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
+        
 
 $if joose:
     <script type="text/javascript" src="/static/joose.mini.js"></script>
@@ -25,7 +30,7 @@ $if joose:
     </div>
     
     <div id='reviewMode' style='display:none'>
-        <div id="reviewContent" style="margin: 16px">
+        <div id="reviewContent" style="margin: 16px 0px 16px 16px">
             <div id="question" style="font-size: 20px; ">Sample question</div>
             <div id="padding" style="font-size: 4px; ">&nbsp</div>
             
@@ -60,12 +65,22 @@ $if joose:
                 <span id='title'>iAnki - Welcome</span>
             </td>
             <td align="right">
-                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Change deck</button>
+                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Change deck</button>                
                 <button title="Sync deck" id="syncDeck" onclick="iAnki.syncDeck(1)">Sync</button>
+                <!--<button title="More" id="more">More</button>-->
             </td>
         </tr></table>
     </h1>
     </div>
+    
+    <!--
+    <div id="vertical_slide" style="margin: 16px">
+        <table width=100%>
+        <tr><td>Mark card</td> <td><input type=checkbox id='markCard' name="markCard" title="Mark card"/></td></tr>
+        <tr><td>Tags</td> <td><input type=text id='cardTags' name='cardTags' title="Card tags"/></td></tr>
+        </table>
+	</div>
+    -->
 
     <div id='debugLog'>
         <span id="ankilog"></span>

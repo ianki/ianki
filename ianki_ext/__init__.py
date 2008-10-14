@@ -7,7 +7,7 @@ This is the web server setup of the iAnki plugin for Anki.
 
 """
 
-__version__ = "0.1b2"
+__version__ = "0.1b3"
 __all__ = []
 
 import os
@@ -45,6 +45,7 @@ from anki.stats import dailyStats, globalStats
 urls = (
   '/', 'index',
   '',  'index',
+  '/cache.manifest',  'cache_manifest',
   '/anki/sync.html', 'anki_sync')
 
 render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned off
@@ -54,6 +55,11 @@ class index:
         joose = ui.useGears
         web.output(render.ianki(joose))
 
+class cache_manifest:
+    def GET(self):
+        web.header('Content-Type', 'text/cache-manifest')
+        web.output(render.cache_manifest())
+        
 tables = {}
 tables['decks'] = [ 'id',
                     'created',

@@ -1,7 +1,7 @@
 // Copyright (C) 2008 Victor Miura
 // License: GNU GPL, version 3 or later; 
 // http://www.gnu.org/copyleft/gpl.html
-var iankiVersion = 'iAnki (0.1b2)';
+var iankiVersion = 'iAnki (0.1b3)';
 var versionTitle = iankiVersion + ' - ';
 var autoKill = 0;
 var autoSync = 0;
@@ -536,6 +536,15 @@ Deck.prototype.showAnswer = function(){
     catch(e){
 		anki_exception('Deck.showAnswer Exception:' + e);
 	}
+}
+
+Deck.prototype.markCard = function(){
+	var self = this;
+	try {
+    }
+    catch(e) {
+        anki_exception('Deck.answerCard Exception:' + e);
+    }
 }
 
 Deck.prototype.answerCard = function(ease){
@@ -1880,6 +1889,14 @@ try {
     else {
         window.addEvent('domready',
             function(event){
+                /*
+                var myVerticalSlide = new Fx.Slide('vertical_slide');
+                $('more').addEvent('click', function(e){
+                    e.stop();
+                    myVerticalSlide.toggle();
+                });
+                */
+                
                 iAnki = new IAnki(); // The global IAnki class
                 iAnki.initialize();
             },
