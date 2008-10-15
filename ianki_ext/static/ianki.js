@@ -1,8 +1,8 @@
 // Copyright (C) 2008 Victor Miura
 // License: GNU GPL, version 3 or later; 
 // http://www.gnu.org/copyleft/gpl.html
-var iankiVersion = 'iAnki (0.1b3)';
-var versionTitle = iankiVersion + ' - ';
+//var iankiVersion = 'iAnki (0.1b3)';
+var versionTitle = iankiVersion + ' ';
 var autoKill = 0;
 var autoSync = 0;
 var iAnki;
@@ -405,9 +405,15 @@ Deck.prototype.getFailedCardNow = function(tx, resCallback){
 Deck.prototype.getNextCard = function(resCallback){
 	var self = this;
 	self.markExpiredCardsDue();
+    var failedCount;
+	var reviewCount;
+	var newCount;
+    
     self.getCounts(
         function(a, b, c) {
-            document.title = versionTitle + 'Remaining '+a+' '+b+' '+c;
+            failedCount = a;
+            reviewCount = b;
+            newCount = c;
         }
     );
 	dbTransaction(self.db,
@@ -415,7 +421,18 @@ Deck.prototype.getNextCard = function(resCallback){
 		{
 			try {
 				self.getFailedCardNow(  tx,
-                                        resCallback
+                    function(card) {
+                        function under(x, b){
+                            if(b)
+                                return '<u>'+x+'</u>';
+                            else
+                                return x;
+                        }
+                        if(card) {
+                            iAnki.setTitle(versionTitle + '<br>'+self.syncName +' '+under(failedCount, card.type==0)+' '+under(reviewCount, card.type==1)+' '+under(newCount, card.type==2));
+                        }
+                        resCallback(card);
+                    }
                 );
 			}
 			catch(e){
@@ -682,6 +699,14 @@ Deck.prototype.answerCard = function(ease){
 				}
 				
 				updateStats(card, ease, oldState);
+            
+                // Update card type
+                if(card.reps == 0)
+                    card.type = 2;
+                else if(card.successive)
+                    card.type = 1;
+                else
+                    card.type = 0;
 				
 				arg = [card.modified,
 								 card.firstAnswered,
@@ -710,6 +735,7 @@ Deck.prototype.answerCard = function(ease){
 								 card.matureEase4,
 								 card.yesCount,
 								 card.noCount,
+                                 card.type,
 								 card.id];
 				anki_log('After ' + arg);
 				dbSql(tx,'	update cards \
@@ -739,7 +765,8 @@ Deck.prototype.answerCard = function(ease){
 									matureEase3 = ?, \
 									matureEase4 = ?, \
 									yesCount = ?, \
-									noCount = ? \
+									noCount = ?, \
+                                    type = ? \
 								where id = ?',
 								arg
 				,  function(tx, result) {
@@ -958,7 +985,7 @@ Deck.prototype.nextCard = function() {
                 self.currCard.fuzz = getRandomArbitary(0.95, 1.05);
                 self.currCard.startTime = nowInSeconds();
                 
-                iAnki.setTitle(versionTitle + self.syncName);
+                //iAnki.setTitle(versionTitle + self.syncName);
                 iAnki.setMode($('reviewMode'));
 			}
 			else {
@@ -1231,7 +1258,7 @@ Deck.prototype.realSync = function(resCallback){
                                 },
                                 function() {
                                     //updatesDone += updates['numUpdates'];
-                                    document.title = versionTitle + 'Synched ' + updatesDone + '/' + numUpdates + ' items';
+                                    iAnki.setTitle(versionTitle + 'Synched ' + updatesDone + '/' + numUpdates + ' items');
                                     
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
@@ -1855,11 +1882,11 @@ IAnki.prototype.chooseDeck = function(really){
                     for(var d = 0; d < result.rows.length; d++){
                         var name = result.rows.item(d).name;
                         rows += "<tr>"
-                        rows += "<td><a HREF=# onclick='iAnki.setDeck(\"" + name + "\")'>"+name+"</a></td> ";
-                        rows += "<td><a HREF=# onclick='iAnki.chooseDeck(\"" + name + "\")'>Delete</a> ";
+                        rows += "<td><a style='color:#0000C0' onclick='iAnki.setDeck(\"" + name + "\")'><u>"+name+"</u></a></td> ";
+                        rows += "<td><a style='color:#0000C0'onclick='iAnki.chooseDeck(\"" + name + "\")'><u>Delete</u></a> ";
                         if(name == really) {
                             rows += "<span>Sure? </span> "
-                            rows += "<a HREF=# onclick='iAnki.deleteDeck(\"" + name + "\")'>Yes</a>";
+                            rows += "<a style='color:#0000C0' onclick='iAnki.deleteDeck(\"" + name + "\")'><u>Yes</u></a>";
                         }
                         rows += "</td></tr>";
                     }

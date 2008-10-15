@@ -6,11 +6,10 @@ body {
 	padding:0;
 }
 h1 {
-	font-family: Georgia,"Times New Roman",Times,serif;
-	font-size:16px;
-	color:#083772;
-	letter-spacing:-1px;
-	font-weight:normal;
+	font-family: "arial";
+	font-size:12px;
+	color:#808080;
+	font-weight:strong;
 	background:#eee;
 	padding:0px 20px;
 	border-bottom:1px solid #ccc;

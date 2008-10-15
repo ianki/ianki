@@ -7,12 +7,15 @@ This is the web server setup of the iAnki plugin for Anki.
 
 """
 
-__version__ = "0.1b3"
-__all__ = []
-
 import os
 import sys
 import time
+
+import ui
+reload( sys.modules['ianki_ext.ui'] )
+
+__version__ = ui.__version__
+__all__ = []
 
 #import pretty
 #reload( sys.modules['ianki_ext.pretty'] )
@@ -52,8 +55,11 @@ render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned
 
 class index:
     def GET(self):
-        joose = ui.useGears
-        web.output(render.ianki(joose))
+        if web.ctx.environ['HTTP_USER_AGENT'].find('iPhone') < 0:
+            useGears = True
+        else:
+            useGears = False
+        web.output(render.ianki(__version__, useGears))
 
 class cache_manifest:
     def GET(self):
@@ -358,7 +364,6 @@ class anki_sync:
                         for hour in range(0, 48):
                             if gotCards == maxCards:
                                 break
-
                             # First pick due failed cards
                             failedCards = deck.s.all('SELECT %s FROM cards WHERE \
                                                 type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
@@ -504,9 +509,6 @@ class anki_sync:
         self.POST()
 
 web.webapi.internalerror = web.debugerror
-
-import ui
-reload( sys.modules['ianki_ext.ui'] )
 
 ui.urls = urls
 ui.glob = globals()

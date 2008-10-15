@@ -1,18 +1,21 @@
-$def with (joose)
+$def with (version, joose)
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
 <html manifest="cache.manifest">
     <head>
         <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
-        <!--meta name="apple-mobile-web-app-capable" content="yes" /-->.
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <!--meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /-->
         
-        <title>iAnki (0.1b3) - loading...</title>
+        <title>iAnki ($version) - loading...</title>
         
         <link rel="stylesheet" type="text/css" href="/static/base.css">
         
         <link rel="shorcut icon" href="/static/favicon.ico"/>
         <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
         
+        <script type="text/javascript">
+            var iankiVersion = 'iAnki ($version)';
+        </script>
 
 $if joose:
     <script type="text/javascript" src="/static/joose.mini.js"></script>
@@ -61,17 +64,16 @@ $if joose:
     <div id="padding" style="font-size: 40x; ">&nbsp</div>
     <h1>
         <table width=100%><TR>
-            <td>
+            <td width=70%>
                 <span id='title'>iAnki - Welcome</span>
             </td>
             <td align="right">
-                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Change deck</button>                
+                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Deck</button>                
                 <button title="Sync deck" id="syncDeck" onclick="iAnki.syncDeck(1)">Sync</button>
                 <!--<button title="More" id="more">More</button>-->
             </td>
         </tr></table>
     </h1>
-    </div>
     
     <!--
     <div id="vertical_slide" style="margin: 16px">
