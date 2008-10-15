@@ -1003,8 +1003,10 @@ Deck.prototype.nextCard = function() {
                         iAnki.setTitle(versionTitle+'Welcome');
                         if(nextReviewQ.result().rows.length > 0) {
                             var dueIn = Math.max(0, nextReviewQ.result().rows.item(0)['min(combinedDue)'] - nowInSeconds());
-                            iAnki.setInfo('No reviews to do at this time.<br>The next review will be in ' +
-                                        timeString(dueIn) + '.');
+                            if(dueIn > 0)
+                                iAnki.setInfo('No reviews to do at this time.<br>The next review will be in ' + timeString(dueIn) + '.');
+                            else
+                                iAnki.setInfo('No reviews to do at this time.');
                         }
                         else {
                             iAnki.setInfo('There are no cards to review.');

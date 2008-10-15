@@ -395,7 +395,7 @@ class anki_sync:
                         if gotCards < maxCards:
                             if deck.newCardOrder == 0: # random
                                 newCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                    type = 2, factId, ordinal \
+                                                    type = 2 \
                                                     ORDER BY priority desc, factId, ordinal LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
                             else: # ordered
                                 newCards = deck.s.all('SELECT %s FROM cards WHERE \
