@@ -571,7 +571,7 @@ Deck.prototype.answerCard = function(ease){
 		anki_log('Clicked answer ' + ease + '.');
 		$('answerSide').style.display='none';
 		
-        var time = nowInSeconds();
+        var answerTime = nowInSeconds();
 		var card = new cloneObject(self.currCard);
 		
 		arg = [ card.modified,
@@ -607,7 +607,7 @@ Deck.prototype.answerCard = function(ease){
 		var oldState = this.cardState(card);
 
 		
-		var lastDelay = (time - card.due) / 86400.0;
+		var lastDelay = (answerTime - card.due) / 86400.0;
 		if(lastDelay < 0) lastDelay = 0;
 		
 		card.lastInterval = card.interval;
@@ -626,10 +626,10 @@ Deck.prototype.answerCard = function(ease){
 		
 		dbTransaction(self.db,
 			function(tx){
-				spacingQ = new dbSqlQ(tx,'select models.initialSpacing, models.spacing from \
+				spacingQ = new dbSqlQ(tx,'select models.initialSpacing as initialSpacing, models.spacing as spacing from \
 										facts, models where facts.modelId = models.id and facts.id = ?', [card.factId]
 										);
-				minIntervalQ = new dbSqlQ(tx,'select min(interval) from cards \
+				minIntervalQ = new dbSqlQ(tx,'select min(interval) as minInterval from cards \
 											where factId = ? and id != ?', [card.factId, card.id]
 											);
 			}
@@ -637,11 +637,17 @@ Deck.prototype.answerCard = function(ease){
 		dbTransaction(self.db,
 			function(tx){
 				// This bit must run in a new transaction as it depends on the previous queries to have finished.
-				minSpacing = spacingQ.result().rows.item(0)['models.initialSpacing'];
-				spaceFactor = spacingQ.result().rows.item(0)['models.spacing'];
+                if(spacingQ.result().rows.length > 0) {                    
+                    minSpacing = spacingQ.result().rows.item(0)['initialSpacing'];
+                    spaceFactor = spacingQ.result().rows.item(0)['spacing'];
+                }
+                else {
+                    minSpacing = 0;
+                    spaceFactor = 0;
+                }
 				
 				if (minIntervalQ.result().rows.length > 0)
-					minOfOtherCards = minIntervalQ.result().rows.item(0)['min(interval)'];
+					minOfOtherCards = minIntervalQ.result().rows.item(0)['minInterval'];
 				else
 					minOfOtherCards = 0;
 				
@@ -652,7 +658,7 @@ Deck.prototype.answerCard = function(ease){
 		            space = 0;
 		        space = space * spaceFactor * 86400.0;
 		        space = Math.max(minSpacing, space);
-		        space += time;
+		        space += answerTime;
 				
 				dbSql(tx,'update cards set \
 							spaceUntil = ?, \
@@ -660,7 +666,7 @@ Deck.prototype.answerCard = function(ease){
 							modified = ?, \
 							isDue = 0 \
 							where factId = ? and id != ?',
-							[space, space, time, card.factId, card.id]
+							[space, space, answerTime, card.factId, card.id]
 							);
 			}
 		);
@@ -694,8 +700,8 @@ Deck.prototype.answerCard = function(ease){
 			        else
 			            card.yesCount += 1;
 			        if(!card.firstAnswered)
-			            card.firstAnswered = time;
-			        card.modified = time;
+			            card.firstAnswered = answerTime;
+			        card.modified = answerTime;
 				}
 				
 				updateStats(card, ease, oldState);
@@ -934,11 +940,12 @@ Deck.prototype.answerCard = function(ease){
                 // Write card history
                 var hist = [card.id, card.lastInterval, card.nextInterval, ease, lastDelay, 
 							 card.lastFactor, card.factor, card.reps, card.thinkingTime, card.yesCount, card.noCount,
-							 time];
+							 answerTime];
                 
 				dbSql(tx,	'insert into reviewHistory \
-							(cardId, lastInterval, nextInterval, ease, delay, lastFactor, \
-							nextFactor, reps, thinkingTime, yesCount, noCount, time) \
+							(cardId, lastInterval, nextInterval, ease, delay, \
+                            lastFactor, nextFactor, reps, thinkingTime, yesCount, noCount, \
+                            time) \
 							values ( \
 							?, ?, ?, ?, ?, \
 							?, ?, ?, ?, ?, ?, \
@@ -948,10 +955,10 @@ Deck.prototype.answerCard = function(ease){
                 
                 // Update modified time on this deck
 				dbSql(tx,	'update decks \
-							set modified = ?',[time]);
+							set modified = ?',[answerTime]);
                 
                 // Update lastCardInfo
-                var dueIn = card.due - time;
+                var dueIn = card.due - answerTime;
                 var next = timeString(dueIn);
                 $('lastCardInfo').innerHTML = ' <br>'+card.question+'<br>Will be shown again in '+next+'.';
                 

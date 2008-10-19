@@ -55,7 +55,8 @@ render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned
 
 class index:
     def GET(self):
-        if web.ctx.environ['HTTP_USER_AGENT'].find('iPhone') < 0:
+        #ui.logMsg('HTTP_USER_AGENT: ' + web.ctx.environ['HTTP_USER_AGENT'])
+        if (web.ctx.environ['HTTP_USER_AGENT'].lower().find('iphone') < 0) and (web.ctx.environ['HTTP_USER_AGENT'].lower().find('ipod') < 0):
             useGears = True
         else:
             useGears = False

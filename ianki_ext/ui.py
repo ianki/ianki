@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.1b5"
+__version__ = "0.1b6"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -202,3 +202,44 @@ class IAnkiServerDialog(QtGui.QDialog):
             pass
         query.sema.release(1)
     '''
+
+import anki
+def onCardStats(self):
+    self.addHook("showQuestion", self.onCardStats)
+    self.addHook("helpChanged", self.removeCardStatsHook)
+    txt = ""
+    card = None
+    if self.currentCard:
+        txt += _("<h1>Current card</h1>")
+        txt += anki.stats.CardStats(self.deck, self.currentCard).report()
+        card  = self.currentCard
+        
+        if card:
+            s = self.deck.s.all("select reps, time, delay, ease, thinkingTime, lastInterval, nextInterval from reviewHistory where cardId=:id", id=card.id)
+            
+            stats = anki.stats.CardStats(self.deck, card)
+            txt += '<br>'
+            for x in s:
+                time = stats.strTime(x[1])
+                txt += 'rep %d time %s delay %f ease %d think %f<br>' % (x[0], time, x[2], x[3], x[4])
+    if self.lastCard and self.lastCard != self.currentCard:
+        txt += _("<h1>Last card</h1>")
+        txt += anki.stats.CardStats(self.deck, self.lastCard).report()
+        card  = self.lastCard
+        
+        if card:
+            s = self.deck.s.all("select reps, time, delay, ease, thinkingTime, lastInterval, nextInterval from reviewHistory where cardId=:id", id=card.id)
+            
+            stats = anki.stats.CardStats(self.deck, card)
+            txt += '<br>'
+            for x in s:
+                time = stats.strTime(x[1])
+                txt += 'rep %d time %s delay %f ease %d think %f<br>' % (x[0], time, x[2], x[3], x[4])
+    if not txt:
+        txt = _("No current card or last card.")
+    
+    
+    
+    self.help.showText(txt, key="cardStats")
+    
+AnkiQt.onCardStats = onCardStats
