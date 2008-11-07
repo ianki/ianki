@@ -3,11 +3,12 @@ Module("ORM", function (module) {
     var GEARS_COMPAT = false
     
     // Add Compatibility with the Gears DB
-    if(!window.openDatabase) {
+    if(!isDefined(typeof window.openDatabase)) {
         GEARS_COMPAT = true;
-        window.openDatabase = function (name) {
+        //window.openDatabase
+        openDatabase = function (name) {
             JooseGearsInitializeGears();
-            if(!window.google || !window.google.gears) {
+            if(!isDefined(typeof window.google) || !isDefined(typeof window.google.gears)) {
                 throw "Google Gears required."
             }
             var handle = google.gears.factory.create('beta.database');
@@ -52,7 +53,7 @@ Module("ORM", function (module) {
                 var me = this;
                 var resultSet;
                 try {
-                    if(window.console) {
+                    if(isDefined(typeof window.console)) {
                         console.log("SQL: "+sql+" Args: "+args)
                     }
                     /// XXX run this inside a worker to really become async
@@ -63,7 +64,7 @@ Module("ORM", function (module) {
                     })
                     
                 } catch(e) {
-                    if(window.console) {
+                    if(isDefined(typeof window.console)) {
                         console.log(e + "\nSQL: "+sql + "\nArgs: "+args)
                     }
                     if(onFailure) {
@@ -150,7 +151,7 @@ Module("ORM", function (module) {
     // For gears we build a transaction queue and execute it serialized
     module.transaction  = function (transactionCallback) {
         var me = this;
-        if(window.console)
+        if(isDefined(typeof window.console))
             console.log("Starting transaction ")
         DB.transaction(function (tx) {
             if(GEARS_COMPAT) {
@@ -181,7 +182,7 @@ Module("ORM", function (module) {
     
     // Execute Sql using the current transaction
     module.executeSql = function (sql, args, onSuccess, onError) {
-        if(!GEARS_COMPAT && window.console) { // the gears layer does this anyway
+        if(!GEARS_COMPAT && isDefined(typeof window.console)) { // the gears layer does this anyway
             console.log("Executing SQL: "+sql+" Args: "+args)
         }
         TX.executeSql(
@@ -264,7 +265,7 @@ Module("ORM", function (module) {
                     
                     ENTITY_BUILD_COUNT--
                     if(ENTITY_BUILD_COUNT == 0) {
-                        if(window.onORMLoaded) {
+                        if(isDefined(typeof window.onORMLoaded)) {
                             window.onORMLoaded()    
                         }
                     }
@@ -529,7 +530,7 @@ Module("ORM", function (module) {
                     var sql = "INSERT INTO "+c.tableName()+" VALUES ("+values+")";
                     
                     module.executeSql(sql, args, function onInsertSuccessful (result) {
-                        if(window.console)
+                        if(isDefined(typeof window.console))
                             console.log("INSERTED into "+c.tableName()+" row with id "+result.insertId)
                         me.field(c.primaryKey(), result.insertId)
                         me.isNewEntity = false
@@ -555,7 +556,7 @@ Module("ORM", function (module) {
                     var sql = "UPDATE "+c.tableName()+" SET "+setString+" WHERE "+c.primaryKey() + " = ? ";
                 
                     module.executeSql(sql, args, function onUpdateSuccessful() {
-                        if(window.console)
+                        if(isDefined(typeof window.console))
                             console.log("UPDATED in table "+c.tableName())
                         if(onSave) onSave(me)
                     })
@@ -568,7 +569,7 @@ Module("ORM", function (module) {
                 
                 var sql = "DELETE FROM "+c.tableName()+" WHERE "+c.primaryKey() + " = ? ";
                 module.executeSql(sql, [me.getRowid()], function onDestroySuccessful () {
-                    if(window.console)
+                    if(isDefined(typeof window.console))
                         console.log("DELETED FROM table "+c.tableName())
                     if(onDestroy) onDestroy(me)
                 })
@@ -602,7 +603,7 @@ Module("ORM", function (module) {
             },
             
             select: function (sqlPart, args, onSelect) {
-                if(typeof onSelect != "function" && window.console) {
+                if(typeof onSelect != "function" && isDefined(typeof window.console)) {
                    console.log("There is no onSelect function while selecting from "+this)
                 }
                 var me        = this;
@@ -629,7 +630,7 @@ Module("ORM", function (module) {
                     
                     for(var i = 0; i < result.rows.length; i++) {
                         var row = result.rows.item(i)
-                        if(window.console)
+                        if(isDefined(typeof window.console))
                             console.log("Retrieved row "+(i+1))
                         var o = me.meta.instantiate();
 
@@ -640,7 +641,7 @@ Module("ORM", function (module) {
                         o.isNewEntity = false
                         resultSet[i] = o;
                         resultSet.length = i+1;
-                        if(window.console)
+                        if(isDefined(typeof window.console))
                             console.log("Created "+o)
                     }
                     if(async || (!async && !GEARS_COMPAT)) {

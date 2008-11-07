@@ -1918,7 +1918,7 @@ IAnki.prototype.chooseDeck = function(really){
 }
 
 try {
-    if(!window.openDatabase) {
+    if(!isDefined(typeof window.openDatabase)) {
         iAnki.setInfo('Try enabling Gears support.');
         iAnki.setMode($('infoMode'));
     }

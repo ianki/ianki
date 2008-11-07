@@ -2016,7 +2016,7 @@ Class("Joose.SimpleRequest", {
     has: {_req: {}},
     methods: {
         initialize: function () {
-            if (window.XMLHttpRequest) {
+            if (isDefined(typeof window.XMLHttpRequest)) {
                 this._req = new XMLHttpRequest();
             } else {
                 this._req = new ActiveXObject("Microsoft.XMLHTTP");
@@ -2085,7 +2085,7 @@ Class("Joose.Gears", {
         },
         
         canGears: function () {
-            return window.google && window.google.gears && window.google.gears.factory
+            return isDefined(typeof window.google) && window.google.gears && window.google.gears.factory
         },
         
         /**
@@ -2174,7 +2174,8 @@ Class("Joose.Gears", {
         // APIs implemented: Timer
         setupGearsCompat: function () {
             // setup gears timer api
-            window.timer = {
+            //window.timer = {
+            timer = {
                 setTimeout:    function (func, time) { return window.setTimeout(func, time) },
                 setInterval:   function (func, time) { return window.setInterval(func, time) },
                 clearTimeout:  function (timer) { return window.clearTimeout(timer) },
@@ -2183,7 +2184,7 @@ Class("Joose.Gears", {
         },
         
         clientHasGears: function () { //  XXX code dup with instance method
-            return window.google && window.google.gears && window.google.gears.factory
+            return isDefined(typeof window.google) && window.google.gears && window.google.gears.factory
         },
         
         // a simple AJAX request that uses gears if available
@@ -2270,7 +2271,7 @@ Class("Joose.Gears", {
 // Sorry Google for modifying this :) 
 function JooseGearsInitializeGears() {
   // We are already defined. Hooray!
-  if (window.google && google.gears) {
+  if (isDefined(typeof window.google) && google.gears) {
     return;
   }
 
@@ -2311,7 +2312,7 @@ function JooseGearsInitializeGears() {
   // Note: In Internet Explorer for Windows Mobile, you can't add properties to
   // the window object. However, global objects are automatically added as
   // properties of the window object in all browsers.
-  if (!window.google) {
+  if (!isDefined(typeof window.google)) {
     google = {};
   }
 

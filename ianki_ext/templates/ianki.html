@@ -15,10 +15,33 @@ $def with (version, joose)
         
         <script type="text/javascript">
             var iankiVersion = 'iAnki ($version)';
+            
+            /**
+            * Tests if an element is defined.
+            * @param type - The type of the element to be tested.
+            */
+            function isDefined(type) {
+             return type != 'undefined' && type != 'unknown';
+            }
+            
+            /**
+            * Retrieve a DOM element by its ID.
+            * @param id - The ID of the element to locate.
+            */
+            function getDOMElementById(id) {
+             if (isDefined(typeof document.getElementById)) {
+                return document.getElementById(id);
+             } else if (isDefined(typeof document.all)) {
+                return document.all[id];
+             } else {
+               throw new Error("Can not find a method to locate DOM element.");
+               return null;
+             }
+            }
         </script>
 
 $if joose:
-    <script type="text/javascript" src="/static/joose.mini.js"></script>
+    <script type="text/javascript" src="/static/joose.js"></script>
     <script type="text/javascript" src="/static/orm_async.js"></script>
 <script type="text/javascript" src="/static/mootools.js"></script>
 <script type="text/javascript" src="/static/ianki.js"></script>
