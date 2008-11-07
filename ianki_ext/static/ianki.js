@@ -128,6 +128,8 @@ function dbTransaction(db, callback1, callback2, callback3){
 
 function dbSql(tx, sql, args, callback1, callback2){
 	try {
+        //anki_log("SQL:"+sql+"<BR>ARG:"+args);
+        
 		tx.executeSql(sql, args,
 			function(tx, result){
 				try {
@@ -1069,6 +1071,8 @@ Deck.prototype.loadDeck = function() {
     );
 }
 
+var realSyncJson;
+
 Deck.prototype.realSync = function(resCallback){
     try {
         var self = this;
@@ -1168,6 +1172,154 @@ Deck.prototype.realSync = function(resCallback){
                 for(var i = 0; i < haveModels.rows.length; i++)
                     modelIds[i] = haveModels.rows.item(i).id;
                 
+                function sync2_realsync(result) {
+                    try {
+                        realSyncJson = result; // JSON.decode(result, true)
+                        if(realSyncJson['error'] != 0) {
+                            anki_exception("Error syncing deck in sync2_realsync:" + realSyncJson['exception']);
+                            resCallback();
+                            return;
+                        }
+                                               
+                        // Delete old reviewHistory
+                        dbTransaction(self.db,
+                            function(tx) {
+                                dbSql(tx, 'DELETE FROM reviewHistory',[]);
+                            }
+                        );
+                        
+                        var numUpdates = realSyncJson['numUpdates']
+                        var updatesDone = 0;
+                        
+                        function requestNext() {
+                            anki_log('requestNext ' + updatesDone + ' ' + numUpdates);
+                            
+                            function sync2_nextsync(result) {
+                                try {
+                                    if(result['error'] != 0) {
+                                        alert("Error syncing deck in sync2_nextsync: " + result['exception']);
+                                        resCallback();
+                                        return;
+                                    }
+                                    applyNext(result['updates']);
+                                }
+                                catch(e){
+                                    anki_exception('sync2_nextsync exception:' + e);
+                                }
+                            }
+                            
+                            dbTransaction(self.db,
+                                function(tx) {
+                                    request_send('json='+escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), '/anki/sync2.html', sync2_nextsync);
+                                }
+                            );
+                            /*
+                            var requestUp = new Request.JSON({
+                                url: '/anki/sync.html',
+                                data: JSON.encode({'method':'nextsync', 'syncName':'self.syncName'}),
+                                onSuccess: function(result){
+                                    if(result['error'] != 0) {
+                                        alert("Error syncing deck: " + result['exception']);
+                                        resCallback();
+                                        return;
+                                    }
+                                    
+                                    applyNext(result['updates']);
+                                }
+                            }).POST();
+                            */
+                        }
+                        
+                        function applyNext(updates) {
+                            dbTransaction(self.db,
+                                function(tx) {
+                                    updatesDone += updates['numUpdates'];
+                                    if(updatesDone < numUpdates && updates['numUpdates'] != 0)
+                                    {
+                                        //requestNext();
+                                    }
+                                    
+                                    self.tables.each(
+                                        function(table) {
+                                            // Apply updates
+                                            anki_log(table + ' removed ' + updates[table]['removed'].length + ' modified ' + updates[table]['modified'].length + ' added ' + updates[table]['added'].length);
+                                            
+                                            // Removals
+                                            updates[table]['removed'].each(
+                                                function(row){
+                                                    //anki_log('Remove id ' + row)
+                                                    dbSql(tx, 'DELETE FROM '+table+' WHERE id=?', [row]);
+                                                }
+                                            );
+                                            counts[table][0] += updates[table]['removed'].length;
+                                            
+                                            // Modifications
+                                            {
+                                                var sql = realSyncJson[table+'_sql_update'];
+                                                updates[table]['modified'].each(
+                                                    function(row){
+                                                        //anki_log('Update id ' + row[0])
+                                                        dbSql(tx, sql, row);
+                                                    }
+                                                );
+                                                counts[table][1] += updates[table]['modified'].length;
+                                            }
+                                            
+                                            // Additions
+                                            {
+                                                var sql = realSyncJson[table+'_sql_insert'];
+                                                updates[table]['added'].each(
+                                                    function(row){
+                                                        //anki_log('Add id ' + row[0])
+                                                        dbSql(tx, sql, row);
+                                                    }
+                                                );                                                   
+                                                counts[table][2] += updates[table]['added'].length;
+                                            }
+                                        }
+                                    );
+                                },
+                                function(error) {
+                                    alert("Error syncing deck: " + error);
+                                    resCallback();
+                                },
+                                function() {
+                                    //updatesDone += updates['numUpdates'];
+                                    iAnki.setTitle(versionTitle + 'Synched ' + updatesDone + '/' + numUpdates + ' items');
+                                    
+                                    if(updatesDone < numUpdates && updates['numUpdates'] != 0)
+                                    {
+                                        requestNext();
+                                    }
+                                    else
+                                    {
+                                        // Finished sync
+                                        dbTransaction(self.db,
+                                            function(tx) {
+                                                dbSql(tx, 'UPDATE syncTimes SET lastSyncHost=?, lastSyncClient=?',[realSyncJson['lastSyncHost'], nowInSeconds()]);
+                                            }
+                                        );
+                                        
+                                        dbTransaction(self.db,
+                                            function(tx) {
+                                                finished();
+                                                self.loadDeck();
+                                                resCallback();
+                                                $('syncDeck').disabled = false;
+                                            }
+                                        );
+                                    }
+                                }
+                            );
+                        }
+                        
+                        applyNext(realSyncJson['updates']);
+                    }
+                    catch (e) {
+                        anki_exception('sync2_realsync exception:' + e);
+                    }
+                }
+                
                 sendData['cardIds'] = cardIds;
                 sendData['factIds'] = factIds;
                 sendData['modelIds'] = modelIds;
@@ -1175,6 +1327,13 @@ Deck.prototype.realSync = function(resCallback){
                 sendData['method'] = 'realsync';
                 sendData['syncName'] = self.syncName;
                 
+                dbTransaction(self.db,
+                    function(tx) {
+                        request_send('json='+escape(JSON.encode(sendData)), '/anki/sync2.html', sync2_realsync);
+                    }
+                );
+                
+                /*
                 var request = new Request.JSON({
                     url: '/anki/sync.html',
                     data: JSON.encode(sendData),
@@ -1306,6 +1465,7 @@ Deck.prototype.realSync = function(resCallback){
                         $('syncDeck').disabled = false;
                     }
                 }).POST();
+                */
             }
         );
     }
@@ -1720,6 +1880,31 @@ IAnki.prototype.initialize = function() {
     }
 }
 
+var numRequests = 0;
+request_callback = undefined;
+
+function request_send(send, url, callback)
+{
+    request_callback = callback;
+    request_script = document.createElement("script");
+    domain = 'http://192.168.1.201:8000';
+    // The browser may cache the request if it has the same URL, so add some salt for randomness
+    salt = "&ctime="+escape(''+nowInSeconds()+numRequests);
+    var req = domain+url + "?" + send + salt;
+    numRequests += 1;
+    //anki_exception("<br>-----<br>"+req+"<br>-----<br>");
+    request_script.src = req;
+    document.getElementsByTagName("head")
+        [0].appendChild(request_script);
+}
+
+function request_receive(data)
+{
+    document.getElementsByTagName("head")
+        [0].removeChild(request_script);
+    request_callback(data);
+}
+
 IAnki.prototype.syncDeck = function(mode){    
     try {
         var self = this;
@@ -1729,6 +1914,75 @@ IAnki.prototype.syncDeck = function(mode){
         
         anki_log("Fetching deck info.")
         
+        function sync2Callback(result) {
+            try {
+                json = result; // JSON.decode(result, true)
+                //alert(json);
+                
+                if(json['error'] != 0) {
+                    anki_exception("Error syncing deck in sync2Callback:" + json['exception']);
+                    return;
+                }
+                
+                syncName = json['deck'];
+                anki_log("Deck: " + syncName);
+                
+                var deckQ;
+                dbTransaction(self.dbBase,
+                    function(tx)
+                    {
+                        deckQ = new dbSqlQ(tx,'SELECT * FROM decks \
+                                            WHERE name = ?', [syncName])
+                    }
+                );
+                
+                dbTransaction(self.dbBase,
+                    function(tx)
+                    {
+                        anki_log("Check result");
+                        var isNewDeck = false;
+                        if(deckQ.result().rows.length == 0) {
+                            anki_log("Creating deck: " + syncName + " on client");
+                            dbSql(tx, 'INSERT INTO decks (name) values (?)', [syncName]);
+                            isNewDeck = true;
+                        }
+                        else {
+                            anki_log("Syncing existing deck: " + syncName + " on client");
+                        }
+                        
+                        // Set this deck as the current deck, and sync the deck
+                        self.currentDeck = syncName;
+                        dbSql(tx,'UPDATE settings SET currentDeck=?', [self.currentDeck]);
+                        self.deck = new Deck(syncName, isNewDeck);
+                        
+                        if(mode == 0){
+                            self.deck.sync(
+                                function()
+                                {
+                                    $('syncDeck').disabled = false;
+                                    self.deck.nextCard();
+                                }
+                            );
+                        }
+                        else {
+                            self.deck.realSync(
+                                function()
+                                {
+                                    $('syncDeck').disabled = false;
+                                    self.deck.nextCard();
+                                }
+                            );
+                        }
+                    }
+                );
+            }
+            catch (e) {
+                anki_exception('sync2Callback exception:' + e);
+            }
+        }
+        request_send('json='+escape('{"method":"getdeck"}'), '/anki/sync2.html', sync2Callback);
+        
+        /*
         var request = new Request.JSON({
             url: '/anki/sync.html',
             data: '{"method":"getdeck"}',
@@ -1806,6 +2060,7 @@ IAnki.prototype.syncDeck = function(mode){
                 self.setMode($('infoMode'));
             }
         }).POST();
+        */
     }
     catch (e) {
         anki_exception('IAnki.syncDeck exception:' + e);
