@@ -49,6 +49,7 @@ urls = (
   '/', 'index',
   '',  'index',
   '/cache.manifest',  'cache_manifest',
+  '/anki/install.html', 'anki_install',
   '/anki/sync.html', 'anki_sync',
   '/anki/sync2.html', 'anki_sync2')
 
@@ -56,153 +57,72 @@ render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned
 
 class index:
     def GET(self):
+        # The index just redirects to the installer, passing it the current location
+        redirectHTML = '''
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+    <head>
+        <title>iAnki (%(version)s) - launcher</title>
+        <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
+        <script type="text/javascript">
+            window.location = window.location + "anki/install.html?loc=" + escape(window.location)
+        </script>
+    </head>
+    <body>
+    </body>
+</html> ''' % {'version':ui.__version__}
+        web.output(redirectHTML)
+        
+class anki_install:
+    def GET(self):
+        import base64
+        # favicon
+        f = open(iankiPath+'/static/favicon.ico', 'rb')
+        favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
+        f.close()
         f = open(iankiPath+'/static/base.css')
+        # apple-touch-icon
+        f = open(iankiPath+'/static/anki-logo.png', 'rb')
+        touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
+        f.close()
+        f = open(iankiPath+'/static/base.css')
+        # css
         css = f.read()
         f.close()
-        print >>  sys.stderr, css
         f = open(iankiPath+'/static/mootools.js')
         s1 = f.read()
         f.close()
         f = open(iankiPath+'/static/ianki.js')
         s2 = f.read()
         f.close()
-        magicHTML = r'''
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html manifest="cache.manifest">
-    <head>
-        <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <!--meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /-->
+        f = open(iankiPath+'/templates/ianki.html')
+        iankiHTML = f.read()
+        f.close()
         
-        <title>iAnki (0.2b1) - loading...</title>
+        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        #magicHTML = r'''
+        #''' % {'version':ui.__version__, 'css':css, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        #print >> sys.stderr, "----------------------"
+        #print >> sys.stderr, magicHTML
+        #print >> sys.stderr, "----------------------"
         
-        <!--
-        <link rel="stylesheet" type="text/css" href="/static/base.css">
-        
-        <link rel="shorcut icon" href="/static/favicon.ico"/>
-        <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
-        -->
-        
-        <STYLE>
-        %s
-        </STYLE>       
-        <script type="text/javascript">
-            var iankiVersion = 'iAnki ($version)';
-            
-            /**
-            * Tests if an element is defined.
-            * @param type - The type of the element to be tested.
-            */
-            function isDefined(type) {
-             return type != 'undefined' && type != 'unknown';
-            }
-            
-            /**
-            * Retrieve a DOM element by its ID.
-            * @param id - The ID of the element to locate.
-            */
-            function getDOMElementById(id) {
-             if (isDefined(typeof document.getElementById)) {
-                return document.getElementById(id);
-             } else if (isDefined(typeof document.all)) {
-                return document.all[id];
-             } else {
-               throw new Error("Can not find a method to locate DOM element.");
-               return null;
-             }
-            }
-        </script>
-
-        <script type="text/javascript">
-        %s
-        </script>
-        <script type="text/javascript">
-        %s
-        </script>
-
-    </head>
-    <body>
-    
-    <div id='infoMode' style='display:none'>
-        <div style="margin: 16px">
-            <div id="info" style="font-size: 32px; ">Welcome!</div>
-        </div>
-    </div>
-    
-    <div id='reviewMode' style='display:none'>
-        <div id="reviewContent" style="margin: 16px 0px 16px 16px">
-            <div id="question" style="font-size: 20px; ">Sample question</div>
-            <div id="padding" style="font-size: 4px; ">&nbsp</div>
-            
-            <div id="showAnswerDiv" align='center'>
-                <button id="showAnswer" title="Show the answer" style="font-size: 28px; " onclick="iAnki.deck.showAnswer()">Show answer</button>
-                <div id="lastCardInfo" align='center' style="font-size: 10px; margin-top=30px; "></div>
-            </div>
-            
-            <div id="answerSide" style='display:none'>
-                <div id="answer" style="font-size: 20px; ">Sample answer</div>
-                <div id="padding" style="font-size: 4px; ">&nbsp</div>
-                <div align='center'>
-                    <button id='answer0' title='First time' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(0)'>0</button>
-                    <button id='answer1' title='Made a mistake' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(1)'>1</button>
-                    <button id='answer2' title='Difficult' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(2)'>2</button>
-                    <button id='answer3' title='About right' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(3)'>3</button>                    
-                    <button id='answer4' title='Easy' style='font-size: 28px; ' onclick='iAnki.deck.answerCard(4)'>4</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div id='changeDeckMode' style='display:none' style="margin: 16px">
-        <div id="info" style="font-size: 32px; margin: 16px">Change deck</div>
-        <div id="deckTable"></div>
-    </div>
-    
-    <div id="padding" style="font-size: 40x; ">&nbsp</div>
-    <h1>
-        <table width=100%%><TR>
-            <td width=70%%>
-                <span id='title'>iAnki - Welcome</span>
-            </td>
-            <td align="right">
-                <button title="Choose deck" id="chooseDeck" onclick="iAnki.chooseDeck()">Deck</button>                
-                <button title="Sync deck" id="syncDeck" onclick="iAnki.syncDeck(1)">Sync</button>
-                <!--<button title="More" id="more">More</button>-->
-            </td>
-        </tr></table>
-    </h1>
-    
-    <!--
-    <div id="vertical_slide" style="margin: 16px">
-        <table width=100%%>
-        <tr><td>Mark card</td> <td><input type=checkbox id='markCard' name="markCard" title="Mark card"/></td></tr>
-        <tr><td>Tags</td> <td><input type=text id='cardTags' name='cardTags' title="Card tags"/></td></tr>
-        </table>
-	</div>
-    -->
-
-    <div id='debugLog'>
-        <span id="ankilog"></span>
-    </div>
-	</body>
-</html>
-''' % (css, s1, s2)
-        
-        import base64
-        test64 = base64.b64encode(magicHTML)
-        dataURL = r'<a href="data:text/html;charset=utf-8;base64,%s" >Click here</a>' % test64
-        indexHTML = r'''
+        test64 = base64.b64encode(iankiHTML)
+        #import urllib
+        #testUrlencode = urllib.urlencode(magicHTML)
+        #dataURL = r'<a href="data:text/html;charset=utf-8;base64,%s" >Click here</a>' % test64
+        installHTML = r'''
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">
 <html lang="en">
-<head>
-    <title>Magic URL</title>
-</head>
-<body>
-    %s
-</body>
+    <head>
+        <title>iAnki (%(version)s) - installer</title>
+        <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
+    </head>
+    <body>
+        <a href="data:text/html;charset=utf-8;base64,%(payload)s" >Click here</a>
+    </body>
 </html>
-''' % dataURL
-        web.output(indexHTML)
+''' % {'version':ui.__version__, 'payload':test64}
+        web.output(installHTML)
 
 '''
 class index:
@@ -745,6 +665,7 @@ class anki_sync2:
                         modelModifiedIndex = modelFields.index('modified')
 
                         # Get cards to review for the next 2 days, up to maxCards
+                        ui.logMsg(' selecting cards');
                         maxCards = 400
                         gotCards = 0
                         pickCards = []
@@ -871,7 +792,8 @@ class anki_sync2:
                             json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
                             json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
                         json['numUpdates'] = countUpdates()
-                        json['updates'] = getUpdate(200)
+                        json['updates'] = getUpdate(100)
+                        ui.logMsg(' sending %d updates' % json['updates']['numUpdates']);
                         #printUpdate(json['updates'])
                         #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                     finally:
@@ -880,7 +802,8 @@ class anki_sync2:
 
                     #ui.logMsg('Sync complete')
                 elif data['method'] == 'nextsync':
-                    json['updates'] = getUpdate(200)
+                    json['updates'] = getUpdate(100)
+                    ui.logMsg(' sending %d updates' % json['updates']['numUpdates']);
                     #printUpdate(json['updates'])
                     #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                 else:
@@ -900,21 +823,9 @@ class anki_sync2:
         res = simplejson.dumps(json, ensure_ascii=False)
         #web.output('request_callback("%s");' % res)
         out = u"request_callback(%s);" % res
-        '''
-        out = out.replace("\\", "\\^_")
-        out = out.replace("\b", "\\b")
-        out = out.replace("\t", "\\t")
-        out = out.replace("\n", "\\n")
-        out = out.replace("\f", "\\f")
-        out = out.replace("\r", "\\r")
-        out = out.replace('"', '\\"')
-        out = out.replace("\\^_", "\\\\")
-        
-        #$specialChars: {'\b': '\\b', '\t': '\\t', '\n': '\\n', '\f': '\\f', '\r': '\\r', '"' : '\\"', '\\': '\\\\'},
-        '''
-        
         #print >> sys.stderr, "response: '"+ out +"'"
         web.output(out)
+        ui.logMsg(' done %d bytes' % len(out));
         
 web.webapi.internalerror = web.debugerror
 

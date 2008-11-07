@@ -1210,7 +1210,7 @@ Deck.prototype.realSync = function(resCallback){
                             
                             dbTransaction(self.db,
                                 function(tx) {
-                                    request_send('json='+escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), '/anki/sync2.html', sync2_nextsync);
+                                    request_send('json='+escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), 'anki/sync2.html', sync2_nextsync);
                                 }
                             );
                             /*
@@ -1329,7 +1329,7 @@ Deck.prototype.realSync = function(resCallback){
                 
                 dbTransaction(self.db,
                     function(tx) {
-                        request_send('json='+escape(JSON.encode(sendData)), '/anki/sync2.html', sync2_realsync);
+                        request_send('json='+escape(JSON.encode(sendData)), 'anki/sync2.html', sync2_realsync);
                     }
                 );
                 
@@ -1887,10 +1887,9 @@ function request_send(send, url, callback)
 {
     request_callback = callback;
     request_script = document.createElement("script");
-    domain = 'http://192.168.1.201:8000';
     // The browser may cache the request if it has the same URL, so add some salt for randomness
     salt = "&ctime="+escape(''+nowInSeconds()+numRequests);
-    var req = domain+url + "?" + send + salt;
+    var req = iankiServer+url + "?" + send + salt;
     numRequests += 1;
     //anki_exception("<br>-----<br>"+req+"<br>-----<br>");
     request_script.src = req;
@@ -1900,8 +1899,8 @@ function request_send(send, url, callback)
 
 function request_receive(data)
 {
-    document.getElementsByTagName("head")
-        [0].removeChild(request_script);
+    //document.getElementsByTagName("head")
+    //    [0].removeChild(request_script);
     request_callback(data);
 }
 
@@ -1980,7 +1979,7 @@ IAnki.prototype.syncDeck = function(mode){
                 anki_exception('sync2Callback exception:' + e);
             }
         }
-        request_send('json='+escape('{"method":"getdeck"}'), '/anki/sync2.html', sync2Callback);
+        request_send('json='+escape('{"method":"getdeck"}'), 'anki/sync2.html', sync2Callback);
         
         /*
         var request = new Request.JSON({

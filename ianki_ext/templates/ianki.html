@@ -1,51 +1,22 @@
-$def with (version, joose)
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html manifest="cache.manifest">
+<html>
     <head>
         <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <!--meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /-->
         
-        <title>iAnki ($version) - loading...</title>
+        <title>iAnki (%(version)s) - loading...</title>
         
+        <!--
         <link rel="stylesheet" type="text/css" href="/static/base.css">
         
         <link rel="shorcut icon" href="/static/favicon.ico"/>
         <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
-        
-        <script type="text/javascript">
-            var iankiVersion = 'iAnki ($version)';
-            
-            /**
-            * Tests if an element is defined.
-            * @param type - The type of the element to be tested.
-            */
-            function isDefined(type) {
-             return type != 'undefined' && type != 'unknown';
-            }
-            
-            /**
-            * Retrieve a DOM element by its ID.
-            * @param id - The ID of the element to locate.
-            */
-            function getDOMElementById(id) {
-             if (isDefined(typeof document.getElementById)) {
-                return document.getElementById(id);
-             } else if (isDefined(typeof document.all)) {
-                return document.all[id];
-             } else {
-               throw new Error("Can not find a method to locate DOM element.");
-               return null;
-             }
-            }
-        </script>
-
-$if joose:
-    <script type="text/javascript" src="/static/joose.js"></script>
-    <script type="text/javascript" src="/static/orm_async.js"></script>
-<script type="text/javascript" src="/static/mootools.js"></script>
-<script type="text/javascript" src="/static/ianki.js"></script>
-
+        -->
+               
+        <STYLE>
+        %(css)s
+        </STYLE>
     </head>
     <body>
     
@@ -86,8 +57,8 @@ $if joose:
     
     <div id="padding" style="font-size: 40x; ">&nbsp</div>
     <h1>
-        <table width=100%><TR>
-            <td width=70%>
+        <table width=100%%><TR>
+            <td width=70%%>
                 <span id='title'>iAnki - Welcome</span>
             </td>
             <td align="right">
@@ -100,7 +71,7 @@ $if joose:
     
     <!--
     <div id="vertical_slide" style="margin: 16px">
-        <table width=100%>
+        <table width=100%%>
         <tr><td>Mark card</td> <td><input type=checkbox id='markCard' name="markCard" title="Mark card"/></td></tr>
         <tr><td>Tags</td> <td><input type=text id='cardTags' name='cardTags' title="Card tags"/></td></tr>
         </table>
@@ -111,4 +82,34 @@ $if joose:
         <span id="ankilog"></span>
     </div>
 	</body>
+
+    <script type="text/javascript">
+        var iankiVersion = 'iAnki (%(version)s)';
+        var iankiServer = '%(location)s';
+        /**
+        * Tests if an element is defined.
+        * @param type - The type of the element to be tested.
+        */
+        function isDefined(type) {
+         return type != 'undefined' && type != 'unknown';
+        }
+        
+        /**
+        * Retrieve a DOM element by its ID.
+        * @param id - The ID of the element to locate.
+        */
+        function getDOMElementById(id) {
+         if (isDefined(typeof document.getElementById)) {
+            return document.getElementById(id);
+         } else if (isDefined(typeof document.all)) {
+            return document.all[id];
+         } else {
+           throw new Error("Can not find a method to locate DOM element.");
+           return null;
+         }
+        }
+        
+        %(mootools)s
+        %(ianki)s
+    </script>
 </html>
