@@ -74,20 +74,37 @@ class index:
         
 class anki_install:
     def GET(self):
+        if (web.ctx.environ['HTTP_USER_AGENT'].lower().find('iphone') < 0) and (web.ctx.environ['HTTP_USER_AGENT'].lower().find('ipod') < 0):
+            iPhone = False
+        else:
+            iPhone = True
+            
         import base64
         # favicon
-        f = open(iankiPath+'/static/favicon.ico', 'rb')
-        favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
-        f.close()
-        f = open(iankiPath+'/static/base.css')
-        # apple-touch-icon
-        f = open(iankiPath+'/static/anki-logo.png', 'rb')
-        touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
-        f.close()
-        f = open(iankiPath+'/static/base.css')
+        #f = open(iankiPath+'/static/favicon.ico', 'rb')
+        #favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
+        #f.close()
+        favicon = ""
+        
         # css
+        f = open(iankiPath+'/static/base.css')
         css = f.read()
         f.close()
+        
+        if iPhone:
+            f = open(iankiPath+'/static/anki-logo.png', 'rb')
+            touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
+            f.close()
+            joose = ""
+            orm = ""
+        else:
+            touchicon = ""
+            f = open(iankiPath+'/static/joose.mini.js')
+            joose = f.read()
+            f.close()
+            f = open(iankiPath+'/static/orm_async.js')
+            orm = f.read()
+            f.close()
         f = open(iankiPath+'/static/mootools.js')
         s1 = f.read()
         f.close()
@@ -98,7 +115,7 @@ class anki_install:
         iankiHTML = f.read()
         f.close()
         
-        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
         #magicHTML = r'''
         #''' % {'version':ui.__version__, 'css':css, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
         #print >> sys.stderr, "----------------------"
@@ -117,7 +134,10 @@ class anki_install:
         <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=1;" />
     </head>
     <body>
-        <a href="data:text/html;charset=utf-8;base64,%(payload)s" >Click here</a>
+        <div align='center'>
+        <span style="font-size: 20px;">Bookmark the following link</span><br>
+        <a style="font-size: 32px;" href="data:text/html;charset=utf-8;base64,%(payload)s" >iAnki (%(version)s)</a>
+        </div>
     </body>
 </html>
 ''' % {'version':ui.__version__, 'payload':test64}

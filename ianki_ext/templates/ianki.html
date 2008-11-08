@@ -5,17 +5,8 @@
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <!--meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /-->
         
-        <title>iAnki (%(version)s) - loading...</title>
-        
-        <!--
-        <link rel="stylesheet" type="text/css" href="/static/base.css">
-        
-        <link rel="shorcut icon" href="/static/favicon.ico"/>
-        <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
-        -->
-        
+        <title>iAnki (%(version)s) - loading...</title>        
         %(touchicon)s
-        
         <STYLE>
         %(css)s
         </STYLE>
@@ -71,16 +62,6 @@
         </tr></table>
     </h1>
     
-    <!--
-    <div id="vertical_slide" style="margin: 16px">
-        <table width=100%%>
-        <tr><td>Mark card</td> <td><input type=checkbox id='markCard' name="markCard" title="Mark card"/></td></tr>
-        <tr><td>Tags</td> <td><input type=text id='cardTags' name='cardTags' title="Card tags"/></td></tr>
-        </table>
-	</div>
-    style='height:0px;width:0px;visibility:hidden;'
-    -->
-
     <div id='debugLog'>
         <span id="ankilog"></span>
     </div>
@@ -113,6 +94,8 @@
          }
         }
         
+        %(joose)s
+        %(orm)s
         %(mootools)s
         %(ianki)s
     </script>

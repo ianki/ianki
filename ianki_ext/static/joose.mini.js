@@ -67,9 +67,7 @@ components: function () {return [
 "Joose.TypeCoercion"
 ]
 },
-loadComponents: function (basePath) {var html = "";Joose.A.each(this.components(), function (name) {var url    = ""+basePath + "/" + name.split(".").join("/") + ".js";html += '<script type="text/javascript" src="'+url+'"></script>'
-})
-document.write(html)
+loadComponents: function (basePath) {
 }
 }
 Joose.copyObject = function (source, target) {var keys = "";Joose.O.each(source, function (value, name) {  keys+=", "+name; target[name] = value })
