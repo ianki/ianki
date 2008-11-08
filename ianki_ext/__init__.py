@@ -10,6 +10,7 @@ This is the web server setup of the iAnki plugin for Anki.
 import os
 import sys
 import time
+import slimmer
 
 import ui
 reload( sys.modules['ianki_ext.ui'] )
@@ -71,6 +72,8 @@ class index:
     </body>
 </html> ''' % {'version':ui.__version__}
         web.output(redirectHTML)
+
+makeSlim = True
         
 class anki_install:
     def GET(self):
@@ -80,12 +83,6 @@ class anki_install:
             iPhone = True
             
         import base64
-        # favicon
-        #f = open(iankiPath+'/static/favicon.ico', 'rb')
-        #favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
-        #f.close()
-        favicon = ""
-        
         # css
         f = open(iankiPath+'/static/base.css')
         css = f.read()
@@ -95,17 +92,22 @@ class anki_install:
             f = open(iankiPath+'/static/anki-logo.png', 'rb')
             touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
             f.close()
+            favicon = ""
             joose = ""
             orm = ""
         else:
             touchicon = ""
+            # favicon
+            f = open(iankiPath+'/static/favicon.ico', 'rb')
+            favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
+            f.close()
             f = open(iankiPath+'/static/joose.mini.js')
             joose = f.read()
             f.close()
             f = open(iankiPath+'/static/orm_async.js')
             orm = f.read()
             f.close()
-        f = open(iankiPath+'/static/mootools.js')
+        f = open(iankiPath+'/static/mootools-1.2.1-core.js')
         s1 = f.read()
         f.close()
         f = open(iankiPath+'/static/ianki.js')
@@ -115,13 +117,14 @@ class anki_install:
         iankiHTML = f.read()
         f.close()
         
-        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
-        #magicHTML = r'''
-        #''' % {'version':ui.__version__, 'css':css, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
-        #print >> sys.stderr, "----------------------"
-        #print >> sys.stderr, magicHTML
-        #print >> sys.stderr, "----------------------"
+        if makeSlim:
+            s2 = slimmer.js_slimmer(s2)            
         
+        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        
+        #if makeSlim:
+        #    iankiHTML = slimmer.xhtml_slimmer(iankiHTML)
+            
         test64 = base64.b64encode(iankiHTML)
         #import urllib
         #testUrlencode = urllib.urlencode(magicHTML)

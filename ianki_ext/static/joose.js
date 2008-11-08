@@ -131,13 +131,6 @@ Joose.prototype = {
     },
 
     loadComponents: function (basePath) {
-        var html = "";
-        Joose.A.each(this.components(), function (name) {
-            var url    = ""+basePath + "/" + name.split(".").join("/") + ".js";
-           
-            html += '<script type="text/javascript" src="'+url+'"></script>'
-        })
-        document.write(html)
     }
 }
 
