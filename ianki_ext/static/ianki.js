@@ -200,7 +200,6 @@ dbSqlQ.prototype.error = function(){
 	return this._error;
 }
 
-
 var STATS_LIFE = 0;
 var STATS_DAY = 1;
 
@@ -1077,7 +1076,7 @@ Deck.prototype.realSync = function(resCallback){
     try {
         var self = this;
         anki_log("Deck.realSync " + self.syncName);
-        iAnki.setInfo('Synching ' + self.syncName + '...');
+        iAnki.setInfo('Syncing ' + self.syncName + '...');
         iAnki.setMode($('infoMode'));
         var sendData = {};
                 
@@ -1172,11 +1171,11 @@ Deck.prototype.realSync = function(resCallback){
                 for(var i = 0; i < haveModels.rows.length; i++)
                     modelIds[i] = haveModels.rows.item(i).id;
                 
-                function sync2_realsync(result) {
+                function sync_realsync(result) {
                     try {
                         realSyncJson = result; // JSON.decode(result, true)
                         if(realSyncJson['error'] != 0) {
-                            anki_exception("Error syncing deck in sync2_realsync:" + realSyncJson['exception']);
+                            anki_exception("Error syncing deck in sync_realsync:" + realSyncJson['exception']);
                             resCallback();
                             return;
                         }
@@ -1194,23 +1193,23 @@ Deck.prototype.realSync = function(resCallback){
                         function requestNext() {
                             anki_log('requestNext ' + updatesDone + ' ' + numUpdates);
                             
-                            function sync2_nextsync(result) {
+                            function sync_nextsync(result) {
                                 try {
                                     if(result['error'] != 0) {
-                                        alert("Error syncing deck in sync2_nextsync: " + result['exception']);
+                                        alert("Error syncing deck in sync_nextsync: " + result['exception']);
                                         resCallback();
                                         return;
                                     }
                                     applyNext(result['updates']);
                                 }
                                 catch(e){
-                                    anki_exception('sync2_nextsync exception:' + e);
+                                    anki_exception('sync_nextsync exception:' + e);
                                 }
                             }
                             
                             dbTransaction(self.db,
                                 function(tx) {
-                                    request_send('json='+escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), 'anki/sync2.html', sync2_nextsync);
+                                    request_send(escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), 'anki/sync.html', sync_nextsync);
                                 }
                             );
                             /*
@@ -1316,7 +1315,7 @@ Deck.prototype.realSync = function(resCallback){
                         applyNext(realSyncJson['updates']);
                     }
                     catch (e) {
-                        anki_exception('sync2_realsync exception:' + e);
+                        anki_exception('sync_realsync exception:' + e);
                     }
                 }
                 
@@ -1329,7 +1328,7 @@ Deck.prototype.realSync = function(resCallback){
                 
                 dbTransaction(self.db,
                     function(tx) {
-                        request_send('json='+escape(JSON.encode(sendData)), 'anki/sync2.html', sync2_realsync);
+                        request_send(escape(JSON.encode(sendData)), 'anki/sync.html', sync_realsync);
                     }
                 );
                 
@@ -1883,7 +1882,7 @@ IAnki.prototype.initialize = function() {
 var numRequests = 0;
 request_callback = undefined;
 
-function request_send(send, url, callback)
+function request_chunk(send, url, callback)
 {
     request_callback = callback;
     request_script = document.createElement("script");
@@ -1891,17 +1890,45 @@ function request_send(send, url, callback)
     salt = "&ctime="+escape(''+nowInSeconds()+numRequests);
     var req = iankiServer+url + "?" + send + salt;
     numRequests += 1;
-    //anki_exception("<br>-----<br>"+req+"<br>-----<br>");
+    anki_log("<br>-----<br>"+req.length+" "+req+"<br>-----<br>");
     request_script.src = req;
-    document.getElementsByTagName("head")
+    document.getElementsByTagName("body")
         [0].appendChild(request_script);
 }
 
 function request_receive(data)
 {
-    //document.getElementsByTagName("head")
-    //    [0].removeChild(request_script);
+    document.getElementsByTagName("body")
+        [0].removeChild(request_script);
     request_callback(data);
+}
+
+function request_send(send, url, callback)
+{
+    var id = escape(nowInSeconds());
+    var data = send;
+    var pos = 0;
+    var len = data.length;
+    var maxChunk = 1000;
+    
+    function do_chunk(arg){
+        anki_log("do_chunk:"+arg);
+        if(pos != len){
+            var todo = Math.min(len-pos, maxChunk);
+            if(todo >= 1 && data.charAt(pos+todo-1) == '%')
+                todo += 2;
+            else if(todo >= 2 && data.charAt(pos+todo-2) == '%')
+                todo += 1;
+            var todoPart = data.substring(pos, pos+todo);
+            anki_log("Todo:"+todoPart);
+            pos += todo;
+            request_chunk("id="+id+"&togo="+(len-pos)+"&payload="+todoPart, url, do_chunk);
+        }
+        else{
+            callback(arg);
+        }
+    }
+    do_chunk('ok');
 }
 
 IAnki.prototype.syncDeck = function(mode){    
@@ -1913,13 +1940,13 @@ IAnki.prototype.syncDeck = function(mode){
         
         anki_log("Fetching deck info.")
         
-        function sync2Callback(result) {
+        function syncCallback(result) {
             try {
                 json = result; // JSON.decode(result, true)
                 //alert(json);
                 
                 if(json['error'] != 0) {
-                    anki_exception("Error syncing deck in sync2Callback:" + json['exception']);
+                    anki_exception("Error syncing deck in syncCallback:" + json['exception']);
                     return;
                 }
                 
@@ -1976,11 +2003,11 @@ IAnki.prototype.syncDeck = function(mode){
                 );
             }
             catch (e) {
-                anki_exception('sync2Callback exception:' + e);
+                anki_exception('syncCallback exception:' + e);
             }
         }
-        request_send('json='+escape('{"method":"getdeck"}'), 'anki/sync2.html', sync2Callback);
-        
+        request_send(escape('{"method":"getdeck"}'), 'anki/sync.html', syncCallback);
+                
         /*
         var request = new Request.JSON({
             url: '/anki/sync.html',

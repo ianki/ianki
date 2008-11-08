@@ -50,8 +50,7 @@ urls = (
   '',  'index',
   '/cache.manifest',  'cache_manifest',
   '/anki/install.html', 'anki_install',
-  '/anki/sync.html', 'anki_sync',
-  '/anki/sync2.html', 'anki_sync2')
+  '/anki/sync.html', 'anki_sync')
 
 render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned off
 
@@ -350,483 +349,265 @@ def printUpdate(up):
             for i in update[t]['added']:
                 print >>  sys.stderr, "  ", i
 
-class anki_sync:
-    def POST(self):
-        json = {}
-        json['error'] = 0
-        json['exception'] = 'Unset'
+def procSync(inputData):
+    json = {}
+    json['error'] = 0
+    json['exception'] = 'Unset'
+    try:
+        data = simplejson.loads(inputData)
+        #print >> sys.stderr, "request"
+        #pretty.pretty(data)
         try:
-            data = simplejson.loads(web.data())
-            #print >> sys.stderr, "request"
-            #pretty.pretty(data)
-            try:
-                if data['method'] == 'getdeck':
-                    json['deck'] = ui.ankiQt.syncName
-                elif data['method'] == 'realsync':
-                    # ToDo: Error if syncName doesn't match the current deck
-                    ui.logMsg('Sync started for deck ' + data['syncName'])
-                    deck = DeckStorage.Deck(ui.ankiQt.deckPath, rebuild=False)
-                    try:
-                        deck.rebuildQueue()
-                        # Apply client updates
-                        if len(data['reviewHistory']) > 0:
-                            ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
-                            timeSave = time.time
-                            thinkingTimeSave = cards.Card.thinkingTime
-                            numApplied = 0
-                            numDropped = 0
+            if data['method'] == 'getdeck':
+                ui.logMsg('Sync started')
+                json['deck'] = ui.ankiQt.syncName
+            elif data['method'] == 'realsync':
+                # ToDo: Error if syncName doesn't match the current deck
+                ui.logMsg('Syncing deck ' + data['syncName'])
+                deck = DeckStorage.Deck(ui.ankiQt.deckPath, rebuild=False)
+                try:
+                    deck.rebuildQueue()
+                    # Apply client updates
+                    if len(data['reviewHistory']) > 0:
+                        ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
+                        timeSave = time.time
+                        thinkingTimeSave = cards.Card.thinkingTime
+                        numApplied = 0
+                        numDropped = 0
+                        try:
+                            def timeOverride():
+                                    return review['time']
+                            def thinkingTimeOverride(self):
+                                return review['thinkingTime']
+                            
                             try:
-                                def timeOverride():
-                                        return review['time']
-                                def thinkingTimeOverride(self):
-                                    return review['thinkingTime']
-                                
+                                deck._globalStats = globalStats(deck)
+                                deck._dailyStats = dailyStats(deck)
+                            except:
+                                deck._globalStats = globalStats(deck.s)
+                                deck._dailyStats = dailyStats(deck.s)
+                            
+                            time.time = timeOverride
+                            cards.Card.thinkingTime = thinkingTimeOverride
+                            
+                            for review in data['reviewHistory']:
                                 try:
-                                    deck._globalStats = globalStats(deck)
-                                    deck._dailyStats = dailyStats(deck)
-                                except:
-                                    deck._globalStats = globalStats(deck.s)
-                                    deck._dailyStats = dailyStats(deck.s)
-                                
-                                time.time = timeOverride
-                                cards.Card.thinkingTime = thinkingTimeOverride
-                                
-                                for review in data['reviewHistory']:
-                                    try:
-                                        card = deck.cardFromId(int(review['cardId']))
-                                        if review['reps'] == card.reps + 1: # Apply only in order reps
-                                            deck.answerCard(card, review['ease'])
-                                            numApplied += 1
-                                        else:
-                                            numDropped += 1
-                                    except:
+                                    card = deck.cardFromId(int(review['cardId']))
+                                    if review['reps'] == card.reps + 1: # Apply only in order reps
+                                        deck.answerCard(card, review['ease'])
+                                        numApplied += 1
+                                    else:
                                         numDropped += 1
-                            finally:
-                                time.time = timeSave
-                                cards.Card.thinkingTime = thinkingTimeSave
-                                if numApplied > 0:
-                                    # Update anything that may have changed
-                                    deck.modified = time.time()
-                                    deck.save()
-                                if numDropped > 0:
-                                    ui.logMsg(' Dropped %d stale reviews' % numDropped)
+                                except:
+                                    numDropped += 1
+                        finally:
+                            time.time = timeSave
+                            cards.Card.thinkingTime = thinkingTimeSave
+                            if numApplied > 0:
+                                # Update anything that may have changed
+                                deck.modified = time.time()
+                                deck.save()
+                            if numDropped > 0:
+                                ui.logMsg(' Dropped %d stale reviews' % numDropped)
 
-                        # Send host updates
-                        json['lastSyncHost'] = time.time()
-                        global update
-                        update = {}
+                    # Send host updates
+                    json['lastSyncHost'] = time.time()
+                    global update
+                    update = {}
 
-                        cardFields = tables['cards']
-                        cardIdIndex = cardFields.index('id')
-                        cardFactIdIndex = cardFields.index('factId')
-                        cardModifiedIndex = cardFields.index('modified')
-                        factFields = tables['facts']
-                        factIdIndex = factFields.index('id')
-                        factModelIdIndex = factFields.index('modelId')
-                        factModifiedIndex = factFields.index('modified')
-                        modelFields = tables['models']
-                        modelIdIndex = modelFields.index('id')
-                        modelModifiedIndex = modelFields.index('modified')
+                    cardFields = tables['cards']
+                    cardIdIndex = cardFields.index('id')
+                    cardFactIdIndex = cardFields.index('factId')
+                    cardModifiedIndex = cardFields.index('modified')
+                    factFields = tables['facts']
+                    factIdIndex = factFields.index('id')
+                    factModelIdIndex = factFields.index('modelId')
+                    factModifiedIndex = factFields.index('modified')
+                    modelFields = tables['models']
+                    modelIdIndex = modelFields.index('id')
+                    modelModifiedIndex = modelFields.index('modified')
 
-                        # Get cards to review for the next 2 days, up to maxCards
-                        maxCards = 400
-                        gotCards = 0
-                        pickCards = []
-                        pickCardsIds = set()
-                        checkTime = time.time()
-                        prevTime = 0
-                        for hour in range(0, 48, 4):
-                            if gotCards == maxCards:
-                                break
-                            # First pick due failed cards
-                            failedCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                                ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                    # Get cards to review for the next 2 days, up to maxCards
+                    maxCards = 400
+                    gotCards = 0
+                    pickCards = []
+                    pickCardsIds = set()
+                    checkTime = time.time()
+                    prevTime = 0
+                    for hour in range(0, 48, 4):
+                        if gotCards == maxCards:
+                            break
+                        # First pick due failed cards
+                        failedCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                            type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
+                                            ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
 
-                            for c in failedCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
+                        for c in failedCards:
+                            cardId = c[cardIdIndex]
+                            if cardId not in pickCardsIds:
+                                pickCardsIds.add(cardId)
+                                pickCards.append(c)
+                                gotCards += 1
 
-                            # Next pick due review cards
-                            reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                                ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                        # Next pick due review cards
+                        reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                            type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
+                                            ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
 
-                            for c in reviewCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
+                        for c in reviewCards:
+                            cardId = c[cardIdIndex]
+                            if cardId not in pickCardsIds:
+                                pickCardsIds.add(cardId)
+                                pickCards.append(c)
+                                gotCards += 1
 
-                            prevTime = checkTime - 60
-                            checkTime += 60 * 60
+                        prevTime = checkTime - 60
+                        checkTime += 60 * 60
 
-                        # Finally pick new cards
-                        if gotCards < maxCards:
-                            if deck.newCardOrder == 0: # random
-                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                    type = 2 \
-                                                    ORDER BY priority desc, factId, ordinal LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
-                            else: # ordered
-                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                    type = 2 \
-                                                    ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
-                            for c in newCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
+                    # Finally pick new cards
+                    if gotCards < maxCards:
+                        if deck.newCardOrder == 0: # random
+                            newCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 2 \
+                                                ORDER BY priority desc, factId, ordinal LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
+                        else: # ordered
+                            newCards = deck.s.all('SELECT %s FROM cards WHERE \
+                                                type = 2 \
+                                                ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
+                        for c in newCards:
+                            cardId = c[cardIdIndex]
+                            if cardId not in pickCardsIds:
+                                pickCardsIds.add(cardId)
+                                pickCards.append(c)
+                                gotCards += 1
 
-                        #print >> sys.stderr, 'Sync', len(pickCards)
+                    #print >> sys.stderr, 'Sync', len(pickCards)
 
-                        haveCards = set()
-                        for i in data['cardIds']:
-                            haveCards.add(int(i))
-                        haveFacts = set()
-                        for i in data['factIds']:
-                            haveFacts.add(int(i))
-                        haveModels = set()
-                        for i in data['modelIds']:
-                            haveModels.add(int(i))
+                    haveCards = set()
+                    for i in data['cardIds']:
+                        haveCards.add(int(i))
+                    haveFacts = set()
+                    for i in data['factIds']:
+                        haveFacts.add(int(i))
+                    haveModels = set()
+                    for i in data['modelIds']:
+                        haveModels.add(int(i))
 
-                        updateCards = [[],[],[]] # modify, add, remove
-                        updateFacts = [[],[],[]] # modify, add, remove
-                        updateModels = [[],[],[]] # modify, add, remove
+                    updateCards = [[],[],[]] # modify, add, remove
+                    updateFacts = [[],[],[]] # modify, add, remove
+                    updateModels = [[],[],[]] # modify, add, remove
 
-                        pickFacts = {}
-                        for card in pickCards:
-                            cardId = card[cardIdIndex]
-                            if cardId in haveCards:
-                                if card[cardModifiedIndex] > data['lastSyncHost']:
-                                    updateCards[0].append( procRow(cardFields, card, True) ) # Modify
-                                haveCards.remove(cardId)
-                            else:
-                                updateCards[1].append( procRow(cardFields, card, False) ) # Add
-                            pickFacts[card[cardFactIdIndex]] = None
+                    pickFacts = {}
+                    for card in pickCards:
+                        cardId = card[cardIdIndex]
+                        if cardId in haveCards:
+                            if card[cardModifiedIndex] > data['lastSyncHost']:
+                                updateCards[0].append( procRow(cardFields, card, True) ) # Modify
+                            haveCards.remove(cardId)
+                        else:
+                            updateCards[1].append( procRow(cardFields, card, False) ) # Add
+                        pickFacts[card[cardFactIdIndex]] = None
 
-                        pickModels = {}
-                        for factId in pickFacts.keys():
-                            fact = deck.s.first('SELECT %s FROM facts WHERE id=%d' % (getFieldList(factFields), factId))
-                            if factId in haveFacts:
-                                if fact[factModifiedIndex] > data['lastSyncHost']:
-                                    updateFacts[0].append( procRow(factFields, fact, True) ) # Modify
-                                haveFacts.remove(factId)
-                            else:
-                                updateFacts[1].append( procRow(factFields, fact, False) ) # Add
-                            pickModels[fact[factModelIdIndex]] = None
+                    pickModels = {}
+                    for factId in pickFacts.keys():
+                        fact = deck.s.first('SELECT %s FROM facts WHERE id=%d' % (getFieldList(factFields), factId))
+                        if factId in haveFacts:
+                            if fact[factModifiedIndex] > data['lastSyncHost']:
+                                updateFacts[0].append( procRow(factFields, fact, True) ) # Modify
+                            haveFacts.remove(factId)
+                        else:
+                            updateFacts[1].append( procRow(factFields, fact, False) ) # Add
+                        pickModels[fact[factModelIdIndex]] = None
 
-                        for modelId in pickModels.keys():
-                            model = deck.s.first('SELECT %s FROM models WHERE id=%d' % (getFieldList(modelFields), modelId))
-                            if modelId in haveModels:
-                                if model[modelModifiedIndex] > data['lastSyncHost']:
-                                    updateModels[0].append( procRow(modelFields, model, True) ) # Modify
-                                haveModels.remove(modelId)
-                            else:
-                                updateModels[1].append( procRow(modelFields, model, False) ) # Add
+                    for modelId in pickModels.keys():
+                        model = deck.s.first('SELECT %s FROM models WHERE id=%d' % (getFieldList(modelFields), modelId))
+                        if modelId in haveModels:
+                            if model[modelModifiedIndex] > data['lastSyncHost']:
+                                updateModels[0].append( procRow(modelFields, model, True) ) # Modify
+                            haveModels.remove(modelId)
+                        else:
+                            updateModels[1].append( procRow(modelFields, model, False) ) # Add
 
-                        # Mark the remaining items for removal
-                        for x in haveCards:
-                            updateCards[2].append(str(x))
-                        for x in haveFacts:
-                            updateFacts[2].append(str(x))
-                        for x in haveModels:
-                            updateModels[2].append(str(x))
+                    # Mark the remaining items for removal
+                    for x in haveCards:
+                        updateCards[2].append(str(x))
+                    for x in haveFacts:
+                        updateFacts[2].append(str(x))
+                    for x in haveModels:
+                        updateModels[2].append(str(x))
 
-                        update['cards'] = {'modified': updateCards[0], 'added': updateCards[1], 'removed': updateCards[2]}
-                        update['facts'] = {'modified': updateFacts[0], 'added': updateFacts[1], 'removed': updateFacts[2]}
-                        update['models'] = {'modified': updateModels[0], 'added': updateModels[1], 'removed': updateModels[2]}
+                    update['cards'] = {'modified': updateCards[0], 'added': updateCards[1], 'removed': updateCards[2]}
+                    update['facts'] = {'modified': updateFacts[0], 'added': updateFacts[1], 'removed': updateFacts[2]}
+                    update['models'] = {'modified': updateModels[0], 'added': updateModels[1], 'removed': updateModels[2]}
 
-                        addedDeck = deck.s.all('SELECT %s FROM %s WHERE created > %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost']))
-                        modifiedDeck = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost'], data['lastSyncHost']))
-                        update['decks'] = { 'modified': [procRow(tables['decks'], x, True) for x in modifiedDeck],
-                                            'added': [procRow(tables['decks'], x, False) for x in addedDeck],
-                                            'removed': [] }
+                    addedDeck = deck.s.all('SELECT %s FROM %s WHERE created > %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost']))
+                    modifiedDeck = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost'], data['lastSyncHost']))
+                    update['decks'] = { 'modified': [procRow(tables['decks'], x, True) for x in modifiedDeck],
+                                        'added': [procRow(tables['decks'], x, False) for x in addedDeck],
+                                        'removed': [] }
 
-                        for t in tables.keys():
-                            json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
-                            json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
-                        json['numUpdates'] = countUpdates()
-                        json['updates'] = getUpdate(200)
-                        #printUpdate(json['updates'])
-                        #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
-                    finally:
-                        deck.save()
-                        deck.close()
-
-                    #ui.logMsg('Sync complete')
-                elif data['method'] == 'nextsync':
+                    for t in tables.keys():
+                        json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
+                        json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
+                    json['numUpdates'] = countUpdates()
                     json['updates'] = getUpdate(200)
                     #printUpdate(json['updates'])
                     #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
-                else:
-                    json['error'] = 1
-                    json['exception'] = 'Invalid method:' + data['method']
-            finally:
-                pass
-        #finally:
-        #    pass
-        except Exception, e:
-            json['error'] = 1
-            json['exception'] = str(e)
-            print >> sys.stderr, "Exception", e
-            ui.logMsg('There were errors during sync.')
-        #print >> sys.stderr, "response"
-        #pretty.pretty(json)
-        res = simplejson.dumps(json, ensure_ascii=False)
-        web.output(res)
+                finally:
+                    deck.save()
+                    deck.close()
+
+                #ui.logMsg('Sync complete')
+            elif data['method'] == 'nextsync':
+                json['updates'] = getUpdate(200)
+                #printUpdate(json['updates'])
+                #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
+            else:
+                json['error'] = 1
+                json['exception'] = 'Invalid method:' + data['method']
+        finally:
+            pass
+    #finally:
+    #    pass
+    except Exception, e:
+        json['error'] = 1
+        json['exception'] = str(e)
+        print >> sys.stderr, "Exception", e
+        ui.logMsg('There were errors during sync.')
+    #print >> sys.stderr, "response"
+    #pretty.pretty(json)
+    res = simplejson.dumps(json, ensure_ascii=False)
+    return res
+
+syncData = {}
+
+class anki_sync:
     def GET(self):
-        self.POST()
-
-class anki_sync2:
-    def GET(self):
-        #print >> sys.stderr, "anki_sync2 was called", web.input()
+        input = web.input(id=None, togo='0', payload='')
+        #print >> sys.stderr, "     id:", input.id
+        #print >> sys.stderr, "   togo:", input.togo
+        #print >> sys.stderr, "payload:", input.payload
         
-        json = {}
-        json['error'] = 0
-        json['exception'] = 'Unset'
-        try:
-            print >> sys.stderr, "anki_sync2:", web.input()
-            input = web.input(json='{}')
-            data = simplejson.loads(input.json)
-            print >> sys.stderr, "request", data
-            #pretty.pretty(data)
-            try:
-                if data['method'] == 'getdeck':
-                    json['deck'] = ui.ankiQt.syncName
-                elif data['method'] == 'realsync':
-                    # ToDo: Error if syncName doesn't match the current deck
-                    ui.logMsg('Sync started for deck ' + data['syncName'])
-                    deck = DeckStorage.Deck(ui.ankiQt.deckPath, rebuild=False)
-                    try:
-                        deck.rebuildQueue()
-                        # Apply client updates
-                        if len(data['reviewHistory']) > 0:
-                            ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
-                            timeSave = time.time
-                            thinkingTimeSave = cards.Card.thinkingTime
-                            numApplied = 0
-                            numDropped = 0
-                            try:
-                                def timeOverride():
-                                        return review['time']
-                                def thinkingTimeOverride(self):
-                                    return review['thinkingTime']
-                                
-                                try:
-                                    deck._globalStats = globalStats(deck)
-                                    deck._dailyStats = dailyStats(deck)
-                                except:
-                                    deck._globalStats = globalStats(deck.s)
-                                    deck._dailyStats = dailyStats(deck.s)
-                                
-                                time.time = timeOverride
-                                cards.Card.thinkingTime = thinkingTimeOverride
-                                
-                                for review in data['reviewHistory']:
-                                    try:
-                                        card = deck.cardFromId(int(review['cardId']))
-                                        if review['reps'] == card.reps + 1: # Apply only in order reps
-                                            deck.answerCard(card, review['ease'])
-                                            numApplied += 1
-                                        else:
-                                            numDropped += 1
-                                    except:
-                                        numDropped += 1
-                            finally:
-                                time.time = timeSave
-                                cards.Card.thinkingTime = thinkingTimeSave
-                                if numApplied > 0:
-                                    # Update anything that may have changed
-                                    deck.modified = time.time()
-                                    deck.save()
-                                if numDropped > 0:
-                                    ui.logMsg(' Dropped %d stale reviews' % numDropped)
-
-                        # Send host updates
-                        json['lastSyncHost'] = time.time()
-                        global update
-                        update = {}
-
-                        cardFields = tables['cards']
-                        cardIdIndex = cardFields.index('id')
-                        cardFactIdIndex = cardFields.index('factId')
-                        cardModifiedIndex = cardFields.index('modified')
-                        factFields = tables['facts']
-                        factIdIndex = factFields.index('id')
-                        factModelIdIndex = factFields.index('modelId')
-                        factModifiedIndex = factFields.index('modified')
-                        modelFields = tables['models']
-                        modelIdIndex = modelFields.index('id')
-                        modelModifiedIndex = modelFields.index('modified')
-
-                        # Get cards to review for the next 2 days, up to maxCards
-                        ui.logMsg(' selecting cards');
-                        maxCards = 400
-                        gotCards = 0
-                        pickCards = []
-                        pickCardsIds = set()
-                        checkTime = time.time()
-                        prevTime = 0
-                        for hour in range(0, 48, 4):
-                            if gotCards == maxCards:
-                                break
-                            # First pick due failed cards
-                            failedCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                                ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
-
-                            for c in failedCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
-
-                            # Next pick due review cards
-                            reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                                ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
-
-                            for c in reviewCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
-
-                            prevTime = checkTime - 60
-                            checkTime += 60 * 60
-
-                        # Finally pick new cards
-                        if gotCards < maxCards:
-                            if deck.newCardOrder == 0: # random
-                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                    type = 2 \
-                                                    ORDER BY priority desc, factId, ordinal LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
-                            else: # ordered
-                                newCards = deck.s.all('SELECT %s FROM cards WHERE \
-                                                    type = 2 \
-                                                    ORDER BY priority desc, due LIMIT %d' % (getFieldList(tables['cards']), maxCards - gotCards))
-                            for c in newCards:
-                                cardId = c[cardIdIndex]
-                                if cardId not in pickCardsIds:
-                                    pickCardsIds.add(cardId)
-                                    pickCards.append(c)
-                                    gotCards += 1
-
-                        #print >> sys.stderr, 'Sync', len(pickCards)
-
-                        haveCards = set()
-                        for i in data['cardIds']:
-                            haveCards.add(int(i))
-                        haveFacts = set()
-                        for i in data['factIds']:
-                            haveFacts.add(int(i))
-                        haveModels = set()
-                        for i in data['modelIds']:
-                            haveModels.add(int(i))
-
-                        updateCards = [[],[],[]] # modify, add, remove
-                        updateFacts = [[],[],[]] # modify, add, remove
-                        updateModels = [[],[],[]] # modify, add, remove
-
-                        pickFacts = {}
-                        for card in pickCards:
-                            cardId = card[cardIdIndex]
-                            if cardId in haveCards:
-                                if card[cardModifiedIndex] > data['lastSyncHost']:
-                                    updateCards[0].append( procRow(cardFields, card, True) ) # Modify
-                                haveCards.remove(cardId)
-                            else:
-                                updateCards[1].append( procRow(cardFields, card, False) ) # Add
-                            pickFacts[card[cardFactIdIndex]] = None
-
-                        pickModels = {}
-                        for factId in pickFacts.keys():
-                            fact = deck.s.first('SELECT %s FROM facts WHERE id=%d' % (getFieldList(factFields), factId))
-                            if factId in haveFacts:
-                                if fact[factModifiedIndex] > data['lastSyncHost']:
-                                    updateFacts[0].append( procRow(factFields, fact, True) ) # Modify
-                                haveFacts.remove(factId)
-                            else:
-                                updateFacts[1].append( procRow(factFields, fact, False) ) # Add
-                            pickModels[fact[factModelIdIndex]] = None
-
-                        for modelId in pickModels.keys():
-                            model = deck.s.first('SELECT %s FROM models WHERE id=%d' % (getFieldList(modelFields), modelId))
-                            if modelId in haveModels:
-                                if model[modelModifiedIndex] > data['lastSyncHost']:
-                                    updateModels[0].append( procRow(modelFields, model, True) ) # Modify
-                                haveModels.remove(modelId)
-                            else:
-                                updateModels[1].append( procRow(modelFields, model, False) ) # Add
-
-                        # Mark the remaining items for removal
-                        for x in haveCards:
-                            updateCards[2].append(str(x))
-                        for x in haveFacts:
-                            updateFacts[2].append(str(x))
-                        for x in haveModels:
-                            updateModels[2].append(str(x))
-
-                        #updateCards = [[],[],[]] # modify, add, remove
-                        #updateFacts = [[],[],[]] # modify, add, remove
-                        #updateModels = [[],[],[]] # modify, add, remove
-                        
-                        update['cards'] = {'modified': updateCards[0], 'added': updateCards[1], 'removed': updateCards[2]}
-                        update['facts'] = {'modified': updateFacts[0], 'added': updateFacts[1], 'removed': updateFacts[2]}
-                        update['models'] = {'modified': updateModels[0], 'added': updateModels[1], 'removed': updateModels[2]}
-
-                        addedDeck = deck.s.all('SELECT %s FROM %s WHERE created > %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost']))
-                        modifiedDeck = deck.s.all('SELECT %s FROM %s WHERE modified > %f and created <= %f' % (getFieldList(tables['decks']), 'decks', data['lastSyncHost'], data['lastSyncHost']))
-                        update['decks'] = { 'modified': [procRow(tables['decks'], x, True) for x in modifiedDeck],
-                                            'added': [procRow(tables['decks'], x, False) for x in addedDeck],
-                                            'removed': [] }
-
-                        for t in tables.keys():
-                            json[t+'_sql_insert'] = 'INSERT INTO ' + t + ' (' + getFieldList(tables[t]) + ') VALUES (' + getValueList(tables[t]) + ')'
-                            json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
-                        json['numUpdates'] = countUpdates()
-                        json['updates'] = getUpdate(100)
-                        ui.logMsg(' sending %d updates' % json['updates']['numUpdates']);
-                        #printUpdate(json['updates'])
-                        #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
-                    finally:
-                        deck.save()
-                        deck.close()
-
-                    #ui.logMsg('Sync complete')
-                elif data['method'] == 'nextsync':
-                    json['updates'] = getUpdate(100)
-                    ui.logMsg(' sending %d updates' % json['updates']['numUpdates']);
-                    #printUpdate(json['updates'])
-                    #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
-                else:
-                    json['error'] = 1
-                    json['exception'] = 'Invalid method:' + data['method']
-            finally:
-                pass
-        #finally:
-        #    pass
-        except Exception, e:
-            json['error'] = 1
-            json['exception'] = str(e)
-            print >> sys.stderr, "Exception", e
-            ui.logMsg('There were errors during sync.')
+        ret = "'bad'"
         
-        #pretty.pretty(json)
-        res = simplejson.dumps(json, ensure_ascii=False)
-        #web.output('request_callback("%s");' % res)
-        out = u"request_callback(%s);" % res
-        #print >> sys.stderr, "response: '"+ out +"'"
+        if id:
+            if id in syncData:
+                syncData[id] += input.payload
+            else:
+                syncData[id] = input.payload
+                
+            if int(input.togo) == 0:
+                #print >> sys.stderr, "process:", syncData[id]
+                ret = procSync(syncData[id])
+                del syncData[id]
+            else:
+                ret = "'continue'"
+        
+        #data = simplejson.loads(input.json)
+        out = u"request_callback(%s);" % ret
+        web.header('Content-Type', 'text/javascript')
         web.output(out)
-        ui.logMsg(' done %d bytes' % len(out));
-        
+        #ui.logMsg(' done %d bytes' % len(out));
 web.webapi.internalerror = web.debugerror
 
 ui.urls = urls

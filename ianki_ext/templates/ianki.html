@@ -13,7 +13,9 @@
         <link rel="shorcut icon" href="/static/favicon.ico"/>
         <link rel="apple-touch-icon" href="/static/anki-logo.png"/>
         -->
-               
+        
+        %(touchicon)s
+        
         <STYLE>
         %(css)s
         </STYLE>
@@ -76,11 +78,13 @@
         <tr><td>Tags</td> <td><input type=text id='cardTags' name='cardTags' title="Card tags"/></td></tr>
         </table>
 	</div>
+    style='height:0px;width:0px;visibility:hidden;'
     -->
 
     <div id='debugLog'>
         <span id="ankilog"></span>
     </div>
+
 	</body>
 
     <script type="text/javascript">

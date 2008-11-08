@@ -766,7 +766,7 @@ class CherryPyWSGIServer(object):
     ssl_private_key = None
 
     def __init__(self, bind_addr, wsgi_app, numthreads=10, server_name=None,
-                 max=-1, request_queue_size=5, timeout=10):
+                 max=-1, request_queue_size=10, timeout=10):
         self.requests = Queue.Queue(max)
 
         if callable(wsgi_app):
@@ -851,7 +851,7 @@ class CherryPyWSGIServer(object):
             raise socket.error, msg
 
         # Timeout so KeyboardInterrupt can be caught on Win32
-        self.socket.settimeout(1)
+        self.socket.settimeout(10)
         self.socket.listen(self.request_queue_size)
 
         # Create worker threads
@@ -951,7 +951,7 @@ class CherryPyWSGIServer(object):
                             s = socket.socket(af, socktype, proto)
                             # See http://groups.google.com/group/cherrypy-users/
                             #        browse_frm/thread/bbfe5eb39c904fe0
-                            s.settimeout(1.0)
+                            s.settimeout(10.0)
                             s.connect((host, port))
                             s.close()
                         except socket.error:

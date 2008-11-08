@@ -157,7 +157,7 @@ def debug(*args):
     Prints a prettyprinted version of `args` to stderr.
     """
     try: 
-        out = ctx.environ['wsgi.errors']
+        out = sys.stderr # ctx.environ['wsgi.errors']
     except: 
         out = sys.stderr
     for arg in args:
@@ -166,7 +166,7 @@ def debug(*args):
 
 def _debugwrite(x):
     try: 
-        out = ctx.environ['wsgi.errors']
+        out = sys.stderr # ctx.environ['wsgi.errors']
     except: 
         out = sys.stderr
     out.write(x)
