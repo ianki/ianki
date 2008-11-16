@@ -387,7 +387,7 @@ def procSync(inputData):
             elif data['method'] == 'realsync':
                 # ToDo: Error if syncName doesn't match the current deck
                 ui.logMsg('Syncing deck ' + data['syncName'])
-                deck = DeckStorage.Deck(ui.ankiQt.deckPath, rebuild=False)
+                deck = DeckStorage.Deck(ui.ankiQt.deckPath)
                 try:
                     deck.rebuildQueue()
                     # Apply client updates
@@ -628,7 +628,7 @@ class anki_sync:
         
         #data = simplejson.loads(input.json)
         out = u"request_callback(%s);" % ret
-        web.header('Content-Type', 'text/javascript')
+        web.header('Content-Type', 'text/javascript; charset=UTF-8')
         web.output(out)
         #ui.logMsg(' done %d bytes' % len(out));
 web.webapi.internalerror = web.debugerror

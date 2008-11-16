@@ -234,8 +234,8 @@ function Deck(syncName, isNewDeck)
 	this.easyIntervalMax=9.0;
 	// delays on failure
 	this.delay0 = 600;
-	this.delay1 = 1200;
-	this.delay2 = 28800;
+	this.delay1 = 600;
+	this.delay2 = 0;
 	// collapsing future cards
 	this.collapseTime = 1;
 	// 0 is random, 1 is by input date
@@ -449,11 +449,11 @@ Deck.prototype.nextDue = function(card, ease, oldState){
 	if (ease == 0) {
 		due = this.delay0;
 	}
-	else if (ease == 1 && oldState != 'mature') {
-		due = this.delay1;
-	}
 	else if (ease == 1) {
-		due = this.delay2;
+        if(oldState == 'mature')
+            due = this.delay1;
+        else
+            due = this.delay0;
 	}
 	else {
 		due = card.interval * 86400.0;
@@ -475,11 +475,17 @@ Deck.prototype.nextInterval = function(card, ease){
 	var delay = self._adjustedDelay(card, ease);
 	var interval = card.interval;
 
-	// if interval is less than mid interval, use presets
-    if(card.interval < self.midIntervalMin)	{
-        if(ease < 2)
-            interval = NEW_INTERVAL;
-        else if(ease == 2)
+    if (ease == 0) {
+        interval = 0;
+    }
+    else if (ease == 1) {
+        interval *= self.delay2;
+        if(interval < self.hardIntervalMin)
+            interval = 0;
+    }
+    else if(interval == 0)
+    {
+        if(ease == 2)
             interval = getRandomArbitary(self.hardIntervalMin,
                                          self.hardIntervalMax);
         else if(ease == 3)
@@ -488,40 +494,27 @@ Deck.prototype.nextInterval = function(card, ease){
         else if(ease == 4)
             interval = getRandomArbitary(self.easyIntervalMin,
                                          self.easyIntervalMax);
-        anki_log("trace A " + interval)
-	}
-    else if(ease == 0) {
-        interval = NEW_INTERVAL;
-        anki_log("trace B " + interval)
     }
-    else
-	{
-        // otherwise, multiply the old interval by a factor
-        if (ease == 1) {
-			var factor = 1 / card.factor / 2.0;
-			interval = card.interval * factor;
-		}
-		else if (ease == 2) {
-			var factor = 1.2;
-			interval = (card.interval + delay / 4) * factor;
-		}
-		else if (ease == 3) {
-			var factor = card.factor;
-			interval = (card.interval + delay / 2) * factor;
-		}
-		else if (ease == 4) {
-			var factor = card.factor * self.factorFour;
-			interval = (card.interval + delay) * factor;
-		}
-        interval *= card.fuzz;
-        anki_log("trace C " + interval + " " + delay + " " + card.fuzz);
-
-	}
+    else {
+        // if not cramming, boost initial 2
+        if (interval < self.hardIntervalMax && interval > 0.166)
+            interval = self.hardIntervalMax * 3.5;
+        // multiply last interval by factor
+        if (ease == 2)
+			interval = (card.interval + delay / 4) * 1.2;
+		else if (ease == 3)
+			interval = (card.interval + delay / 2) * card.factor;
+		else if (ease == 4)
+			interval = (card.interval + delay) * card.factor * self.factorFour;
+            
+        var fuzz = getRandomArbitary(0.95, 1.05);
+        interval *= fuzz;
+    }
+    
     if(self.maxScheduleTime) {
         interval = Math.min(interval, self.maxScheduleTime);
-        anki_log("trace D " + interval)
     }
-
+    
     return interval;
 }
 		
@@ -985,12 +978,11 @@ Deck.prototype.nextCard = function() {
 		function(card){
             if(card != null){
                 self.currCard = new cloneObject(card);
-                $('question').innerHTML = self.currCard.question;
-                $('answer').innerHTML = self.currCard.answer;
+                $('question').innerHTML = (( self.currCard.question ));
+                $('answer').innerHTML = (( self.currCard.answer ));
                 $('showAnswerDiv').style.display = 'block';
                 $('answerSide').style.display = 'none';
 
-                self.currCard.fuzz = getRandomArbitary(0.95, 1.05);
                 self.currCard.startTime = nowInSeconds();
                 
                 //iAnki.setTitle(versionTitle + self.syncName);
@@ -1055,6 +1047,10 @@ Deck.prototype.loadDeck = function() {
                 self.delay0 = deck.delay0;
                 self.delay1 = deck.delay1;
                 self.delay2 = deck.delay2;
+                if(self.version < 15){
+                    self.delay1 = deck.delay0;
+                    self.delay2 = 0.0;
+                }
                 // collapsing future cards
                 self.collapseTime = deck.collapseTime;
                 // 0 is random, 1 is by input date
@@ -1209,7 +1205,7 @@ Deck.prototype.realSync = function(resCallback){
                             
                             dbTransaction(self.db,
                                 function(tx) {
-                                    request_send(escape(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), 'anki/sync.html', sync_nextsync);
+                                    request_send(encodeURIComponent(JSON.encode({'method':'nextsync', 'syncName':'self.syncName'})), 'anki/sync.html', sync_nextsync);
                                 }
                             );
                             /*
@@ -1328,7 +1324,7 @@ Deck.prototype.realSync = function(resCallback){
                 
                 dbTransaction(self.db,
                     function(tx) {
-                        request_send(escape(JSON.encode(sendData)), 'anki/sync.html', sync_realsync);
+                        request_send(encodeURIComponent(JSON.encode(sendData)), 'anki/sync.html', sync_realsync);
                     }
                 );
                 
@@ -1539,8 +1535,41 @@ Deck.prototype.initialize = function(isNewDeck){
 								id INTEGER NOT NULL,  \
 								lastSyncHost NUMERIC(10, 2) NOT NULL,  \
                                 lastSyncClient NUMERIC(10, 2) NOT NULL,  \
+                                version NUMERIC DEFAULT 0.0202, \
                                 PRIMARY KEY (id) \
-                                )');
+                                )');                
+                syncTimesQ = new dbSqlQ(tx, 'SELECT * FROM syncTimes LIMIT 1');
+            }
+        );
+        
+        dbTransaction(self.db,
+			function(tx)
+			{
+                // Drop old views & indices from decks with older versions
+                if(syncTimesQ.result().rows.length > 0) {
+                    var sync = syncTimesQ.result().rows.item(0);
+                    var version = 0.0;
+                    if(sync.version)
+                        version = sync.version;
+                    else
+                        dbSql(tx,'ALTER TABLE syncTimes ADD version NUMERIC DEFAULT 0.0000');                    
+                    if(version < 0.2020) {
+                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsOrdered');
+                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsNow');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCards');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsSoon');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCards');
+                        
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_markExpired');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedIsDue');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newOrderedOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_factId');
+                    }
+                }
                 
                 // Unfortunatly the ids in Anki's tables are 64bit ints, which aren't handled correctly
                 // in JS, so I've changed them all to TEXT to preserve them.
@@ -1561,7 +1590,7 @@ Deck.prototype.initialize = function(isNewDeck){
 								"easyIntervalMax" NUMERIC(10, 2) NOT NULL,  \
 								delay0 INTEGER NOT NULL,  \
 								delay1 INTEGER NOT NULL,  \
-								delay2 INTEGER NOT NULL,  \
+								delay2 FLOAT NOT NULL,  \
 								"collapseTime" INTEGER NOT NULL,  \
 								"highPriority" TEXT NOT NULL,  \
 								"medPriority" TEXT NOT NULL,  \
@@ -1686,40 +1715,58 @@ Deck.prototype.initialize = function(isNewDeck){
 								PRIMARY KEY (id) \
 								)');
                 */
-				dbSql(tx,'	CREATE VIEW IF NOT EXISTS acqCardsOrdered as \
-								select * from cards \
-								where type = 2 and isDue = 1 \
-								order by priority desc, due \
-								');
-				dbSql(tx,'	CREATE VIEW IF NOT EXISTS acqCardsRandom as \
-								select * from cards \
-								where type = 2 and isDue = 1 \
-								order by priority desc, factId, ordinal \
-								');
-				dbSql(tx,'	CREATE VIEW IF NOT EXISTS failedCardsNow as \
-								select * from cards \
-								where type = 0 and isDue = 1 \
-								and combinedDue <= (strftime("%s", "now") + 1) \
-								order by combinedDue \
-								');
-				dbSql(tx,'	CREATE VIEW IF NOT EXISTS failedCards as \
+                dbSql(tx,'	CREATE VIEW IF NOT EXISTS failedCards as \
 								select * from cards \
 								where type = 0 and priority != 0 \
 								order by modified \
 								');
 				dbSql(tx,'	CREATE VIEW IF NOT EXISTS failedCardsSoon as \
-								select * from cards \
-								where type = 0 and priority != 0 \
-								and combinedDue <= \
-								(select max(delay0, delay1)+strftime("%s", "now")+1 \
-								from decks) \
-								order by modified \
+                                select * from cards \
+                                where type = 0 and +priority in (1,2,3,4) \
+                                and combinedDue <= (select max(delay0, delay1) + \
+                                strftime("%s", "now")+1 from decks where id = 1) \
+                                order by type, isDue, combinedDue \
 								');
-				dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCards as \
+                
+                dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCards as \
 								select * from cards where \
 								type = 1 and isDue = 1 \
-								order by type, isDue, priority desc, relativeDelay \
+								order by priority desc, interval desc \
 								');
+                dbSql(tx,'	CREATE VIEW IF NOT EXISTS acqCardsRandom as \
+								select * from cards \
+								where type = 2 and isDue = 1 \
+								order by priority desc, factId, ordinal \
+								');
+				dbSql(tx,'	CREATE VIEW IF NOT EXISTS acqCardsOrdered as \
+								select * from cards \
+								where type = 2 and isDue = 1 \
+								order by priority desc, combinedDue \
+								');
+				dbSql(tx,'	CREATE VIEW IF NOT EXISTS failedCardsNow as \
+                                select * from cards \
+                                where type = 0 and isDue = 1 \
+                                and +priority in (1,2,3,4) \
+                                order by type, isDue, combinedDue \
+								');
+                
+                // card queues
+                dbSql(tx,'create index if not exists ix_cards_combinedDue on cards \
+                            (type, isDue, combinedDue, priority)');
+                
+                dbSql(tx,'create index if not exists ix_cards_revisionOrder on cards \
+                            (type, isDue, priority desc, interval desc)');
+                
+                dbSql(tx,'create index if not exists ix_cards_newRandomOrder on cards \
+                            (type, isDue, priority desc, factId, ordinal)');
+                
+                dbSql(tx,'create index if not exists ix_cards_newOrderedOrder on cards \
+                            (type, isDue, priority desc, combinedDue)');
+                
+                // card spacing
+                dbSql(tx,'create index if not exists ix_cards_factId on cards (factId)');
+                
+                ///////////////
                 
                 dbSql(tx,'create index if not exists ix_cards_markExpired on cards \
                             (isDue, priority desc, combinedDue desc)');
@@ -1740,6 +1787,8 @@ Deck.prototype.initialize = function(isNewDeck){
                         (priority desc, due)');
                 
                 dbSql(tx,'create index if not exists ix_cards_factId on cards (factId)');
+                
+                dbSql(tx,'UPDATE syncTimes SET version=?', [0.2020]);
 			}
 		);
         
@@ -1887,7 +1936,7 @@ function request_chunk(send, url, callback)
     request_callback = callback;
     request_script = document.createElement("script");
     // The browser may cache the request if it has the same URL, so add some salt for randomness
-    salt = "&ctime="+escape(''+nowInSeconds()+numRequests);
+    salt = "&ctime="+encodeURIComponent(''+nowInSeconds()+numRequests);
     var req = iankiServer+url + "?" + send + salt;
     numRequests += 1;
     anki_log("<br>-----<br>"+req.length+" "+req+"<br>-----<br>");
@@ -1905,7 +1954,7 @@ function request_receive(data)
 
 function request_send(send, url, callback)
 {
-    var id = escape(nowInSeconds());
+    var id = encodeURIComponent(nowInSeconds());
     var data = send;
     var pos = 0;
     var len = data.length;
@@ -2006,7 +2055,7 @@ IAnki.prototype.syncDeck = function(mode){
                 anki_exception('syncCallback exception:' + e);
             }
         }
-        request_send(escape('{"method":"getdeck"}'), 'anki/sync.html', syncCallback);
+        request_send(encodeURIComponent('{"method":"getdeck"}'), 'anki/sync.html', syncCallback);
     }
     catch (e) {
         anki_exception('IAnki.syncDeck exception:' + e);
