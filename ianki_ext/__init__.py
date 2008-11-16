@@ -74,20 +74,20 @@ class index:
         web.output(redirectHTML)
 
 makeSlim = True
-        
+
 class anki_install:
     def GET(self):
         if (web.ctx.environ['HTTP_USER_AGENT'].lower().find('iphone') < 0) and (web.ctx.environ['HTTP_USER_AGENT'].lower().find('ipod') < 0):
             iPhone = False
         else:
             iPhone = True
-            
+
         import base64
         # css
         f = open(iankiPath+'/static/base.css')
         css = f.read()
         f.close()
-        
+
         if iPhone:
             f = open(iankiPath+'/static/anki-logo.png', 'rb')
             touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
@@ -116,15 +116,15 @@ class anki_install:
         f = open(iankiPath+'/templates/ianki.html')
         iankiHTML = f.read()
         f.close()
-        
+
         if makeSlim:
-            s2 = slimmer.js_slimmer(s2)            
-        
+            s2 = slimmer.js_slimmer(s2)
+
         iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
-        
+
         #if makeSlim:
         #    iankiHTML = slimmer.xhtml_slimmer(iankiHTML)
-            
+
         test64 = base64.b64encode(iankiHTML)
         #import urllib
         #testUrlencode = urllib.urlencode(magicHTML)
@@ -161,7 +161,7 @@ class cache_manifest:
     def GET(self):
         web.header('Content-Type', 'text/cache-manifest')
         web.output(render.cache_manifest())
-        
+
 tables = {}
 tables['decks'] = [ 'id',
                     'created',
@@ -402,17 +402,17 @@ def procSync(inputData):
                                     return review['time']
                             def thinkingTimeOverride(self):
                                 return review['thinkingTime']
-                            
+
                             try:
                                 deck._globalStats = globalStats(deck)
                                 deck._dailyStats = dailyStats(deck)
                             except:
                                 deck._globalStats = globalStats(deck.s)
                                 deck._dailyStats = dailyStats(deck.s)
-                            
+
                             time.time = timeOverride
                             cards.Card.thinkingTime = thinkingTimeOverride
-                            
+
                             for review in data['reviewHistory']:
                                 try:
                                     card = deck.cardFromId(int(review['cardId']))
@@ -610,22 +610,22 @@ class anki_sync:
         #print >> sys.stderr, "     id:", input.id
         #print >> sys.stderr, "   togo:", input.togo
         #print >> sys.stderr, "payload:", input.payload
-        
+
         ret = "'bad'"
-        
+
         if id:
             if id in syncData:
                 syncData[id] += input.payload
             else:
                 syncData[id] = input.payload
-                
+
             if int(input.togo) == 0:
                 #print >> sys.stderr, "process:", syncData[id]
                 ret = procSync(syncData[id])
                 del syncData[id]
             else:
                 ret = "'continue'"
-        
+
         #data = simplejson.loads(input.json)
         out = u"request_callback(%s);" % ret
         web.header('Content-Type', 'text/javascript')
