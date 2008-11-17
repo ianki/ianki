@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -203,6 +203,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         query.sema.release(1)
     '''
 
+'''
 import anki
 def onCardStats(self):
     self.addHook("showQuestion", self.onCardStats)
@@ -243,3 +244,4 @@ def onCardStats(self):
     self.help.showText(txt, key="cardStats")
     
 AnkiQt.onCardStats = onCardStats
+'''
