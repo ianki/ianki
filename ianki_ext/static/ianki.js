@@ -1096,7 +1096,7 @@ Deck.prototype.realSync = function(resCallback){
                 info += '' + reviewsSynched + ' reviews synched\n';
             self.tables.each( function(table) {
                 // This removal message is a bit confusing, because cards are removed simply for not being due soon.
-                //if(counts[table][0] > 0)
+                ///if(counts[table][0] > 0)
                 //    info += '' + counts[table][0] + ' ' + table + ' removed.\n';
                 if(counts[table][1] > 0)
                     info += '' + counts[table][1] + ' ' + table + ' updated.\n';
