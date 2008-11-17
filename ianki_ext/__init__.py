@@ -457,13 +457,14 @@ def procSync(inputData):
                     pickCardsIds = set()
                     checkTime = time.time()
                     prevTime = 0
-                    for hour in range(0, 48, 4):
+                    hourSkip = 4
+                    for hour in range(0, 48, hourSkip):
                         if gotCards == maxCards:
                             break
                         # First pick due failed cards
                         failedCards = deck.s.all('SELECT %s FROM cards WHERE \
                                             type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                            ORDER BY combinedDue LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                                            ORDER BY modified LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
 
                         for c in failedCards:
                             cardId = c[cardIdIndex]
@@ -475,7 +476,7 @@ def procSync(inputData):
                         # Next pick due review cards
                         reviewCards = deck.s.all('SELECT %s FROM cards WHERE \
                                             type = 1 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                            ORDER BY priority desc, relativeDelay LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                                            ORDER BY priority desc, interval desc LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
 
                         for c in reviewCards:
                             cardId = c[cardIdIndex]
@@ -485,7 +486,7 @@ def procSync(inputData):
                                 gotCards += 1
 
                         prevTime = checkTime - 60
-                        checkTime += 60 * 60
+                        checkTime += 60 * 60 * hourSkip
 
                     # Finally pick new cards
                     if gotCards < maxCards:
