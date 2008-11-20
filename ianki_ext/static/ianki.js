@@ -496,16 +496,18 @@ Deck.prototype.nextInterval = function(card, ease){
                                          self.easyIntervalMax);
     }
     else {
+        //anki_exception("ease " + ease + " factor " + card.factor + " interval " + interval + " himax " + self.hardIntervalMax + " delay " + delay);
+        
         // if not cramming, boost initial 2
         if (interval < self.hardIntervalMax && interval > 0.166)
             interval = self.hardIntervalMax * 3.5;
         // multiply last interval by factor
         if (ease == 2)
-			interval = (card.interval + delay / 4) * 1.2;
+			interval = (interval + delay / 4) * 1.2;
 		else if (ease == 3)
-			interval = (card.interval + delay / 2) * card.factor;
+			interval = (interval + delay / 2) * card.factor;
 		else if (ease == 4)
-			interval = (card.interval + delay) * card.factor * self.factorFour;
+			interval = (interval + delay) * card.factor * self.factorFour;
             
         var fuzz = getRandomArbitary(0.95, 1.05);
         interval *= fuzz;
@@ -515,6 +517,7 @@ Deck.prototype.nextInterval = function(card, ease){
         interval = Math.min(interval, self.maxScheduleTime);
     }
     
+    //anki_exception("final interval " + interval);
     return interval;
 }
 		
