@@ -1283,7 +1283,7 @@ Deck.prototype.realSync = function(resCallback){
                                 },
                                 function() {
                                     //updatesDone += updates['numUpdates'];
-                                    iAnki.setTitle(versionTitle + 'Synched ' + updatesDone + '/' + numUpdates + ' items');
+                                    iAnki.setTitle('Synched ' + updatesDone + '/' + numUpdates + ' items');
                                     
                                     if(updatesDone < numUpdates && updates['numUpdates'] != 0)
                                     {
@@ -1810,6 +1810,10 @@ IAnki.prototype.setTitle = function(title){
     $('title').innerHTML = title;
 }
 
+IAnki.prototype.appendTitle = function(title){
+    $('title').innerHTML += title;
+}
+
 IAnki.prototype.setInfo = function(info){
     $('info').innerHTML = info;
 }
@@ -1963,8 +1967,9 @@ function request_send(send, url, callback)
     var len = data.length;
     var maxChunk = 1000;
     
-    function do_chunk(arg){
-        anki_log("do_chunk:"+arg);
+    function do_chunk(status, arg){
+        anki_log("do_chunk "+status + ", " + arg);
+	iAnki.appendTitle('.');
         if(pos != len){
             var todo = Math.min(len-pos, maxChunk);
             if(todo >= 1 && data.charAt(pos+todo-1) == '%')
@@ -1975,12 +1980,15 @@ function request_send(send, url, callback)
             anki_log("Todo:"+todoPart);
             pos += todo;
             request_chunk("id="+id+"&togo="+(len-pos)+"&payload="+todoPart, url, do_chunk);
-        }
+        }	
         else{
-            callback(arg);
+	    if(status == 'wait')
+		request_chunk("id="+id, url, do_chunk);
+	    else
+		callback(arg);
         }
     }
-    do_chunk('ok');
+    do_chunk('start', '');
 }
 
 IAnki.prototype.syncDeck = function(mode){    
@@ -1988,6 +1996,7 @@ IAnki.prototype.syncDeck = function(mode){
         var self = this;
         $('syncDeck').disabled = true;
         iAnki.setInfo('Syncing...');
+	iAnki.setTitle('Synching...');
         iAnki.setMode($('infoMode'));
         
         anki_log("Fetching deck info.")

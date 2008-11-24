@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -100,6 +100,17 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.iplayout.addWidget(self.portEdit)
         
         self.settingsLayout.addLayout(self.iplayout)
+        
+        # Todo: add card sync parameter settings
+        '''
+        self.maxCards = QtGui.QSlider(QtCore.Qt.Horizontal, self)
+        self.maxCards.setMinimumSize(100, 20)
+        self.maxCards.setMinimum(0)
+        self.maxCards.setMaximum(1000)
+        self.maxCards.setValue(500)
+        self.maxCards.setSingleStep(1)
+        self.settingsLayout.addWidget(self.maxCards)
+        '''
         
         #self.useGears = QtGui.QCheckBox(self)
         #self.useGears.setObjectName("useGears")

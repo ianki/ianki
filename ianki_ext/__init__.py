@@ -335,11 +335,32 @@ def countUpdates():
         ret += len(update[t]['added'])
     return ret
 
+def subUpdate(maxBytes, count, list):      
+    ret = []
+    added = 0
+    for r in list:
+        l = len(str(r))
+        if l <= maxBytes:
+            maxBytes -= l
+            ret.append(r)
+            added += 1
+            count += 1
+        else:
+            break
+    return (maxBytes, count, ret, list[added:])
+
 def getUpdate(maxCount):
+    maxBytes = 64 * 1024
     ret = {}
     ret['numUpdates'] = 0
     for t in tables.keys():
         ret[t] = {'modified':[], 'added':[], 'removed':[]}
+        
+        (maxBytes, ret['numUpdates'], ret[t]['removed'], update[t]['removed']) = subUpdate(maxBytes, ret['numUpdates'], update[t]['removed'])
+        (maxBytes, ret['numUpdates'], ret[t]['modified'], update[t]['modified']) = subUpdate(maxBytes, ret['numUpdates'], update[t]['modified'])
+        (maxBytes, ret['numUpdates'], ret[t]['added'], update[t]['added']) = subUpdate(maxBytes, ret['numUpdates'], update[t]['added'])
+        
+        '''
         mlen = min(maxCount, len(update[t]['removed']))
         if mlen > 0:
             ret[t]['removed'] = update[t]['removed'][:mlen]
@@ -358,6 +379,7 @@ def getUpdate(maxCount):
             update[t]['added'] = update[t]['added'][mlen:]
             maxCount -= mlen
             ret['numUpdates'] += mlen
+        '''
     return ret
 
 def printUpdate(up):
@@ -451,7 +473,7 @@ def procSync(inputData):
                     modelModifiedIndex = modelFields.index('modified')
 
                     # Get cards to review for the next 2 days, up to maxCards
-                    maxCards = 400
+                    maxCards = 500
                     gotCards = 0
                     pickCards = []
                     pickCardsIds = set()
@@ -603,35 +625,79 @@ def procSync(inputData):
     res = simplejson.dumps(json, ensure_ascii=False)
     return res
 
+class SyncBlock:
+    def __init__(self, id):
+        self.id = id
+        self.working = False
+        self.request = u""
+        self.result = None
+        
 syncData = {}
 
+import threading
+class SyncProcThread(threading.Thread):
+    def __init__(self, block):
+        #ui.logMsg(' init thread ' + block.id);
+        threading.Thread.__init__(self)
+        self.block = block
+    def run(self):
+        #ui.logMsg(' run sync ' + self.block.id);
+        ret = procSync(self.block.request)
+        self.block.result = ret
+        #ui.logMsg(' finished sync ' + self.block.id);
+        
 class anki_sync:
     def GET(self):
         input = web.input(id=None, togo='0', payload='')
         #print >> sys.stderr, "     id:", input.id
         #print >> sys.stderr, "   togo:", input.togo
         #print >> sys.stderr, "payload:", input.payload
-
-        ret = "'bad'"
+        id = input.id
+        ret = "''"
+    
+        #ui.logMsg(' sync ' + id);
 
         if id:
             if id in syncData:
-                syncData[id] += input.payload
+                sb = syncData[id]
             else:
-                syncData[id] = input.payload
-
-            if int(input.togo) == 0:
-                #print >> sys.stderr, "process:", syncData[id]
-                ret = procSync(syncData[id])
-                del syncData[id]
+                sb = SyncBlock(id)
+                syncData[id] = sb
+            
+            if sb.working:
+                #ui.logMsg(' working ' + id);
+                if not sb.thread.isAlive():
+                    #ui.logMsg(' thread done ' + id);
+                    #ui.logMsg(' response ' + sb.result);
+                    retStatus = "'done'"
+                    ret = sb.result
+                    del syncData[id]
+                else:
+                    #ui.logMsg(' wait ' + id);
+                    retStatus = "'wait'"
             else:
-                ret = "'continue'"
+                #ui.logMsg(' append ' + id);
+                sb.request += input.payload
+    
+                if int(input.togo) == 0:
+                    sb.working = True
+                    sb.thread = SyncProcThread(sb)
+                    sb.thread.start()
+                    retStatus = "'wait'"
+                    #ui.logMsg(' start ' + id + sb.request);
+                    
+                    #print >> sys.stderr, "process:", syncData[id]
+                    #ret = procSync(syncData[id])
+                    #del syncData[id]
+                else:
+                    #ui.logMsg(' continue ' + id);
+                    retStatus = "'continue'"
 
         #data = simplejson.loads(input.json)
-        out = u"request_callback(%s);" % ret
+        out = u"request_callback(%s, %s);" % (retStatus, ret)
         web.header('Content-Type', 'text/javascript; charset=UTF-8')
         web.output(out)
-        #ui.logMsg(' done %d bytes' % len(out));
+        #ui.logMsg(' done %s, %d bytes' % (retStatus, len(out)));
 web.webapi.internalerror = web.debugerror
 
 ui.urls = urls
