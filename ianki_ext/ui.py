@@ -13,6 +13,8 @@ ankiQt = None
 deckQueryRunner = None
 urls = None
 glob = None
+sync_cards = 500
+sync_days = 1
 
 class ThreadedProc:
     def __init__(self, proc, arg):
@@ -66,6 +68,11 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.config['ianki_ip'] = 'localhost'
         if 'ianki_port' not in self.config:
             self.config['ianki_port'] = '8000'
+            
+        if 'ianki_sync_cards' not in self.config:
+            self.config['ianki_sync_cards'] = sync_cards
+        if 'ianki_sync_days' not in self.config:
+            self.config['ianki_sync_days'] = sync_days
         
         global deckQueryRunner
         deckQueryRunner = self
@@ -99,7 +106,24 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.portEdit.setMinimumSize(50, 20)
         self.iplayout.addWidget(self.portEdit)
         
+        # Sync settings
+        self.slayout = QtGui.QHBoxLayout(self)
+        self.slayout.setObjectName("iplayout")
+        self.slayout.addWidget(QtGui.QLabel(_('Max cards'), self))
+        self.scards = QtGui.QLineEdit(self)
+        self.scards.setObjectName("ipEdit")
+        self.scards.setText(_(self.config['ianki_sync_cards']))
+        self.scards.setMinimumSize(50, 20)
+        self.slayout.addWidget(self.scards)
+        self.slayout.addWidget(QtGui.QLabel(_('Days of reviews'), self))
+        self.sdays = QtGui.QLineEdit(self)
+        self.sdays.setObjectName("portEdit")
+        self.sdays.setText(_(self.config['ianki_sync_days']))
+        self.sdays.setMinimumSize(50, 20)
+        self.slayout.addWidget(self.sdays)
+        
         self.settingsLayout.addLayout(self.iplayout)
+        self.settingsLayout.addLayout(self.slayout)
         
         # Todo: add card sync parameter settings
         '''
@@ -169,6 +193,32 @@ class IAnkiServerDialog(QtGui.QDialog):
     def startClicked(self):
         ip = str(self.ipEdit.text())
         port = str(self.portEdit.text())
+        global sync_cards
+        global sync_days
+        try:
+            sync_cards = int(self.scards.text())
+        except:
+            sync_cards = 1
+        try:
+            sync_days = int(self.sdays.text())
+        except:
+            sync_days = 1
+        if sync_cards < 1:
+            sync_cards = 1
+        elif sync_cards > 1000:
+            sync_cards = 1000
+        if sync_days < 1:
+            sync_days = 1
+        elif sync_days > 4:
+            sync_days = 4
+            
+        self.config['ianki_ip'] = ip
+        self.config['ianki_port'] = port
+        self.config['ianki_sync_cards'] = sync_cards
+        self.config['ianki_sync_days'] = sync_days
+            
+        self.scards.setText(_(str(sync_cards)))
+        self.sdays.setText(_(str(sync_days)))
         web.wsgi.connectIP = ip+':'+port
         
         global urls, glob
@@ -178,8 +228,6 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.startButton.setEnabled(False)
             self.stopButton.setEnabled(True)
             self.settingsBox.setEnabled(False)
-            self.config['ianki_ip'] = ip
-            self.config['ianki_port'] = port
             self.logText.append('Server started.')
         else:
             self.logText.append('Failed to start server.')

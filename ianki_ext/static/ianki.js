@@ -242,6 +242,7 @@ function Deck(syncName, isNewDeck)
 	this.newCardOrder = 0;
 	// when to show new cards
 	this.newCardSpacing = NEW_CARDS_DISTRIBUTE;
+	this.revCardOrder = 0;
     
     this.initialize(isNewDeck);
 }
@@ -367,7 +368,18 @@ Deck.prototype.getNewCard = function(tx, resCallback){
 
 Deck.prototype.getDueCardNow = function(tx, resCallback){
 	var self = this;
-	dbSql(tx,'select * from "revCards" limit 1', [],
+	
+	var revQuery;
+	if(self.revCardOrder == 0)
+	    revQuery = 'select * from "revCardsOld" limit 1';
+	else if(self.revCardOrder == 1)
+	    revQuery = 'select * from "revCardsNew" limit 1';
+	else if(self.revCardOrder == 2)
+	    revQuery = 'select * from "revCardsDue" limit 1';
+	else
+	    revQuery = 'select * from "revCardsRandom" limit 1';
+	    
+	dbSql(tx,revQuery, [],
 		function(tx, result) {
 			if (result.rows.length > 0) {
 				var card = result.rows.item(0);
@@ -1058,6 +1070,7 @@ Deck.prototype.loadDeck = function() {
                 self.collapseTime = deck.collapseTime;
                 // 0 is random, 1 is by input date
                 self.newCardOrder = deck.newCardOrder;
+		self.revCardOrder = deck.revCardOrder;
                 // when to show new cards
                 self.newCardSpacing = deck.newCardSpacing;
             }
@@ -1556,7 +1569,7 @@ Deck.prototype.initialize = function(isNewDeck){
                         version = sync.version;
                     else
                         dbSql(tx,'ALTER TABLE syncTimes ADD version NUMERIC DEFAULT 0.0000');                    
-                    if(version < 0.2020) {
+                    if(version < 0.22) {
                         dbSql(tx,'DROP VIEW IF EXISTS acqCardsOrdered');
                         dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
                         dbSql(tx,'DROP VIEW IF EXISTS failedCardsNow');
@@ -1572,6 +1585,19 @@ Deck.prototype.initialize = function(isNewDeck){
                         dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newOrderedOrder');
                         dbSql(tx,'DROP INDEX IF EXISTS ix_cards_factId');
                     }
+		    if(version < 0.25) {
+			dbSql(tx,'DROP VIEW IF EXISTS revCards');
+			dbSql(tx,'DROP VIEW IF EXISTS revCardsOld');
+			dbSql(tx,'DROP VIEW IF EXISTS revCardsNew');
+			dbSql(tx,'DROP VIEW IF EXISTS revCardsDue');
+			dbSql(tx,'DROP VIEW IF EXISTS revCardsRandom');
+			dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
+			
+			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
+			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
+			
+			dbSql(tx,'alter table decks add column revCardOrder integer not null default 0');
+		    }
                 }
                 
                 // Unfortunatly the ids in Anki's tables are 64bit ints, which aren't handled correctly
@@ -1605,6 +1631,7 @@ Deck.prototype.initialize = function(isNewDeck){
 								"newCardsPerDay" INTEGER NOT NULL,  \
 								"sessionRepLimit" INTEGER NOT NULL,  \
 								"sessionTimeLimit" INTEGER NOT NULL,  \
+								"revCardOrder" INTEGER NOT NULL, \
                                 PRIMARY KEY (id) \
 								)');
 				dbSql(tx,'CREATE TABLE IF NOT EXISTS models ( \
@@ -1731,11 +1758,24 @@ Deck.prototype.initialize = function(isNewDeck){
                                 order by type, isDue, combinedDue \
 								');
                 
-                dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCards as \
-								select * from cards where \
-								type = 1 and isDue = 1 \
-								order by priority desc, interval desc \
-								');
+		dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCardsOld as \
+				    select * from cards \
+				    where type = 1 and isDue = 1 \
+				    order by priority desc, interval desc');
+		dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCardsNew as \
+				    select * from cards \
+				    where type = 1 and isDue = 1 \
+				    order by priority desc, interval');
+		dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCardsDue as \
+				    select * from cards \
+				    where type = 1 and isDue = 1 \
+				    order by priority desc, combinedDue');
+		dbSql(tx,'	CREATE VIEW IF NOT EXISTS revCardsRandom as \
+				    select * from cards \
+				    where type = 1 and isDue = 1 \
+				    order by priority desc, factId, ordinal');
+		
+		
                 dbSql(tx,'	CREATE VIEW IF NOT EXISTS acqCardsRandom as \
 								select * from cards \
 								where type = 2 and isDue = 1 \
@@ -1757,12 +1797,15 @@ Deck.prototype.initialize = function(isNewDeck){
                 dbSql(tx,'create index if not exists ix_cards_combinedDue on cards \
                             (type, isDue, combinedDue, priority)');
                 
-                dbSql(tx,'create index if not exists ix_cards_revisionOrder on cards \
-                            (type, isDue, priority desc, interval desc)');
-                
+		dbSql(tx,'create index if not exists ix_cards_revOldOrder on cards \
+			    (type, isDue, priority desc, interval desc)');
+		
+		dbSql(tx,'create index if not exists ix_cards_revNewOrder on cards \
+			    (type, isDue, priority desc, interval)');
+		
                 dbSql(tx,'create index if not exists ix_cards_newRandomOrder on cards \
                             (type, isDue, priority desc, factId, ordinal)');
-                
+		
                 dbSql(tx,'create index if not exists ix_cards_newOrderedOrder on cards \
                             (type, isDue, priority desc, combinedDue)');
                 
@@ -1778,20 +1821,9 @@ Deck.prototype.initialize = function(isNewDeck){
                         (type, isDue, combinedDue)');
                 
                 dbSql(tx,'create index if not exists ix_cards_failedOrder on cards \
-                        (type, isDue, due)');
-                
-                dbSql(tx,'create index if not exists ix_cards_revisionOrder on cards \
-                        (type, isDue, priority desc, relativeDelay)');
-                
-                dbSql(tx,'create index if not exists ix_cards_newRandomOrder on cards \
-                        (priority desc, factId, ordinal)');
-                
-                dbSql(tx,'create index if not exists ix_cards_newOrderedOrder on cards \
-                        (priority desc, due)');
-                
-                dbSql(tx,'create index if not exists ix_cards_factId on cards (factId)');
-                
-                dbSql(tx,'UPDATE syncTimes SET version=?', [0.2020]);
+                        (type, isDue, due)');    
+                 
+                dbSql(tx,'UPDATE syncTimes SET version=?', [0.25]);
 			}
 		);
         

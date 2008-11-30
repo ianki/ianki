@@ -190,7 +190,8 @@ tables['decks'] = [ 'id',
                     'failedCardMax',
                     'newCardsPerDay',
                     'sessionRepLimit',
-                    'sessionTimeLimit']
+                    'sessionTimeLimit',
+                    'revCardOrder']
 tables['models'] = ['id',
                     'deckId',
                     'created',
@@ -473,20 +474,29 @@ def procSync(inputData):
                     modelModifiedIndex = modelFields.index('modified')
 
                     # Get cards to review for the next 2 days, up to maxCards
-                    maxCards = 500
+                    maxCards = ui.sync_cards
                     gotCards = 0
                     pickCards = []
                     pickCardsIds = set()
                     checkTime = time.time()
                     prevTime = 0
                     hourSkip = 4
-                    for hour in range(0, 48, hourSkip):
+                    for hour in range(0, ui.sync_days * 24, hourSkip):
                         if gotCards == maxCards:
                             break
                         # First pick due failed cards
+                        if deck.revCardOrder == 0:
+                            dueOrder = 'priority desc, interval desc'
+                        elif deck.revCardOrder == 1:
+                            dueOrder = 'priority desc, interval'
+                        elif deck.revCardOrder == 2:
+                            dueOrder = 'priority desc, combinedDue'
+                        else:
+                            dueOrder = 'priority desc, factId, ordinal'
+                        
                         failedCards = deck.s.all('SELECT %s FROM cards WHERE \
                                             type = 0 AND combinedDue >= %f AND combinedDue <= %f AND priority != 0 \
-                                            ORDER BY modified LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, maxCards-gotCards))
+                                            ORDER BY %s LIMIT %d' % (getFieldList(tables['cards']), prevTime, checkTime, dueOrder, maxCards-gotCards))
 
                         for c in failedCards:
                             cardId = c[cardIdIndex]
