@@ -3,30 +3,25 @@
 
 import sys
 import ianki_ext
-from ankiqt.forms.main import Ui_MainWindow
+from ankiqt import mw
 from PyQt4 import QtCore, QtGui
 
-# Override Ui_MainWindow.setupUi to add our menu item
-setupUiBk = Ui_MainWindow.setupUi
-
-def Ui_MainWindow_setupUi(self, MainWindow):
-    setupUiBk(self, MainWindow)
-
-    self.actionRunIAnki = QtGui.QAction(MainWindow)
-    self.actionRunIAnki.setObjectName("actionRunIAnki")
-    self.actionRunIAnki.setText(_("&iAnki Server"))
+def init():
+    mw.actionRunIAnki = QtGui.QAction(mw)
+    mw.actionRunIAnki.setObjectName("actionRunIAnki")
+    mw.actionRunIAnki.setText(_("&iAnki Server"))
     try:
-        menu = self.menuPlugins
+        menu = mw.mainWin.menuPlugins
     except:
-        menu = self.menuTools
+        menu = mw.mainWin.menuTools
     menu.addSeparator()
-    menu.addAction(self.actionRunIAnki)
+    menu.addAction(mw.actionRunIAnki)
 
     def iankiWindow():
         ianki_ext.unload()
-        reload( sys.modules['ianki_ext'] )
-        ianki_ext.ui.IAnkiServerDialog(MainWindow)
+        reload(sys.modules['ianki_ext'])
+        ianki_ext.ui.IAnkiServerDialog(mw)
 
-    MainWindow.connect(self.actionRunIAnki, QtCore.SIGNAL("triggered()"), iankiWindow)
+    mw.connect(mw.actionRunIAnki, QtCore.SIGNAL("triggered()"), iankiWindow)
 
-Ui_MainWindow.setupUi = Ui_MainWindow_setupUi
+init()
