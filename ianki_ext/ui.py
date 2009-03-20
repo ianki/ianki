@@ -29,7 +29,7 @@ class ThreadedProc:
         self.sema.acquire(1)
         if self.e:
             raise self.e
-        
+
 def logMsg(msg):
     def addLog(self, msg):
         self.logText.append(msg)
@@ -38,58 +38,58 @@ def logMsg(msg):
 class IAnkiServerDialog(QtGui.QDialog):
     def __init__(self, parent):
         QtGui.QDialog.__init__(self, parent)
-                
+
         if parent.deck is None and parent.deckPath is None:
             # qt on linux incorrectly accepts shortcuts for disabled actions
             return
-        
+
         global ankiQt
         ankiQt = parent
-        
+
         if ankiQt.deck:
             # save first, so we can rollback on failure
             ankiQt.deck.save()
-            ankiQt.deck.close()
             ankiQt.deckPath = ankiQt.deck.path
             ankiQt.syncName = ankiQt.deck.syncName or ankiQt.deck.name()
             ankiQt.lastSync = ankiQt.deck.lastSync
+            ankiQt.deck.close()
             ankiQt.deck = None
             ankiQt.loadAfterSync = True
-            
+
         #import gc; gc.collect()
         #self.bodyView.clearWindow()
         #self.bodyView.flush()
-        
+
         self.d = parent.deck
         self.config = parent.config
         self.server = None
-        
+
         if 'ianki_ip' not in self.config:
             self.config['ianki_ip'] = 'localhost'
         if 'ianki_port' not in self.config:
             self.config['ianki_port'] = '8000'
-            
+
         if 'ianki_sync_cards' not in self.config:
             self.config['ianki_sync_cards'] = sync_cards
         if 'ianki_sync_days' not in self.config:
             self.config['ianki_sync_days'] = sync_days
-        
+
         global deckQueryRunner
         deckQueryRunner = self
-        
+
         self.setObjectName("iAnki Server")
         self.setWindowTitle(_("iAnki Server (%s)" % __version__))
         self.resize(260, 220)
-        
-        
+
+
         self.vboxlayout = QtGui.QVBoxLayout(self)
         self.vboxlayout.setObjectName("vboxlayout")
-        
+
         ## Settings box
         self.settingsBox = QtGui.QGroupBox("Server settings", self)
         self.settingsLayout = QtGui.QVBoxLayout(self.settingsBox)
         self.vboxlayout.addWidget(self.settingsBox)
-        
+
         # IP settings
         self.iplayout = QtGui.QHBoxLayout(self)
         self.iplayout.setObjectName("iplayout")
@@ -105,7 +105,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.portEdit.setText(_(self.config['ianki_port']))
         self.portEdit.setMinimumSize(50, 20)
         self.iplayout.addWidget(self.portEdit)
-        
+
         # Sync settings
         self.slayout = QtGui.QHBoxLayout(self)
         self.slayout.setObjectName("iplayout")
@@ -121,10 +121,10 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.sdays.setText(_(self.config['ianki_sync_days']))
         self.sdays.setMinimumSize(50, 20)
         self.slayout.addWidget(self.sdays)
-        
+
         self.settingsLayout.addLayout(self.iplayout)
         self.settingsLayout.addLayout(self.slayout)
-        
+
         # Todo: add card sync parameter settings
         '''
         self.maxCards = QtGui.QSlider(QtCore.Qt.Horizontal, self)
@@ -135,13 +135,13 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.maxCards.setSingleStep(1)
         self.settingsLayout.addWidget(self.maxCards)
         '''
-        
+
         #self.useGears = QtGui.QCheckBox(self)
         #self.useGears.setObjectName("useGears")
         #self.useGears.setChecked(self.config['ianki_useGears'])
         #self.useGears.setText(_('Enable Gears'))
         #self.settingsLayout.addWidget(self.useGears)
-        
+
         self.startButton = QtGui.QPushButton(self)
         self.startButton.setText(_("Start"))
         self.startButton.setDefault(True)
@@ -153,17 +153,17 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.vboxlayout.addWidget(self.startButton)
         self.vboxlayout.addWidget(self.stopButton)
         self.vboxlayout.addWidget(self.closeButton)
-        
+
         self.logText = QtGui.QTextEdit(self)
         self.logText.setReadOnly(True)
         self.vboxlayout.addWidget(self.logText)
-        
+
         self.connect(self.startButton, QtCore.SIGNAL("clicked()"), self.startClicked)
         self.connect(self.stopButton, QtCore.SIGNAL("clicked()"), self.stopClicked)
         self.connect(self.closeButton, QtCore.SIGNAL("clicked()"), self.closeClicked)
-        #self.connect(self.useGears, QtCore.SIGNAL("clicked()"), self.useGearsChanged)        
+        #self.connect(self.useGears, QtCore.SIGNAL("clicked()"), self.useGearsChanged)
         self.exec_()
-        
+
         # Reopen after sync finished.
         if ankiQt.loadAfterSync:
             ankiQt.loadDeck(ankiQt.deckPath, sync=False)
@@ -174,7 +174,7 @@ class IAnkiServerDialog(QtGui.QDialog):
             ankiQt.moveToState("noDeck")
         ankiQt.deckPath = None
         ankiQt = None
-    
+
     #def useGearsChanged(self):
     #    global useGears
     #    useGears = self.useGears.isChecked()
@@ -184,12 +184,12 @@ class IAnkiServerDialog(QtGui.QDialog):
         if self.server:
             self.stopClicked()
         QtGui.QDialog.closeEvent(self, evt)
-        
+
     def reject(self):
         if self.server:
             self.stopClicked()
         QtGui.QDialog.reject(self)
-        
+
     def startClicked(self):
         ip = str(self.ipEdit.text())
         port = str(self.portEdit.text())
@@ -211,16 +211,16 @@ class IAnkiServerDialog(QtGui.QDialog):
             sync_days = 1
         elif sync_days > 4:
             sync_days = 4
-            
+
         self.config['ianki_ip'] = ip
         self.config['ianki_port'] = port
         self.config['ianki_sync_cards'] = sync_cards
         self.config['ianki_sync_days'] = sync_days
-            
+
         self.scards.setText(_(str(sync_cards)))
         self.sdays.setText(_(str(sync_days)))
         web.wsgi.connectIP = ip+':'+port
-        
+
         global urls, glob
         self.logText.append('Starting server at ' + web.wsgi.connectIP +'.')
         self.server = web.run(urls, glob);
@@ -231,7 +231,7 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.logText.append('Server started.')
         else:
             self.logText.append('Failed to start server.')
-        
+
     def stopClicked(self):
         self.logText.append('Stopping server.')
         self.stopButton.setEnabled(False)
@@ -242,17 +242,17 @@ class IAnkiServerDialog(QtGui.QDialog):
         queryRunner = None
         self.startButton.setEnabled(True)
         self.settingsBox.setEnabled(True)
-        
+
     def closeClicked(self):
         self.close()
-    
+
     def runProc(self, threadedProc):
         try:
             threadedProc.result = threadedProc.proc(self, threadedProc.arg)
         except Exception, e:
             threadedProc.e = e
         threadedProc.sema.release(1)
-        
+
     '''
     def runQuery(self, query):
         try:
@@ -273,10 +273,10 @@ def onCardStats(self):
         txt += _("<h1>Current card</h1>")
         txt += anki.stats.CardStats(self.deck, self.currentCard).report()
         card  = self.currentCard
-        
+
         if card:
             s = self.deck.s.all("select reps, time, delay, ease, thinkingTime, lastInterval, nextInterval from reviewHistory where cardId=:id", id=card.id)
-            
+
             stats = anki.stats.CardStats(self.deck, card)
             txt += '<br>'
             for x in s:
@@ -286,10 +286,10 @@ def onCardStats(self):
         txt += _("<h1>Last card</h1>")
         txt += anki.stats.CardStats(self.deck, self.lastCard).report()
         card  = self.lastCard
-        
+
         if card:
             s = self.deck.s.all("select reps, time, delay, ease, thinkingTime, lastInterval, nextInterval from reviewHistory where cardId=:id", id=card.id)
-            
+
             stats = anki.stats.CardStats(self.deck, card)
             txt += '<br>'
             for x in s:
@@ -297,10 +297,10 @@ def onCardStats(self):
                 txt += 'rep %d time %s delay %f ease %d think %f<br>' % (x[0], time, x[2], x[3], x[4])
     if not txt:
         txt = _("No current card or last card.")
-    
-    
-    
+
+
+
     self.help.showText(txt, key="cardStats")
-    
+
 AnkiQt.onCardStats = onCardStats
 '''
