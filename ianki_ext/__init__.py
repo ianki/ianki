@@ -51,6 +51,7 @@ urls = (
   '',  'index',
   '/cache.manifest',  'cache_manifest',
   '/anki/install.html', 'anki_install',
+  '/anki/mobile.html', 'anki_direct',
   '/anki/sync.html', 'anki_sync')
 
 render = web.template.render(iankiPath+'/templates/', False) # Cashing is turned off
@@ -74,59 +75,69 @@ class index:
         web.output(redirectHTML)
 
 makeSlim = True
+import base64
+
+def geniAnki(self):
+    if (web.ctx.environ['HTTP_USER_AGENT'].lower().find('iphone') < 0) and (web.ctx.environ['HTTP_USER_AGENT'].lower().find('ipod') < 0):
+        iPhone = False
+    else:
+        iPhone = True
+
+    # css
+    f = open(iankiPath+'/static/base.css')
+    css = f.read()
+    f.close()
+
+    if iPhone:
+        f = open(iankiPath+'/static/anki-logo.png', 'rb')
+        touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
+        f.close()
+        favicon = ""
+        joose = ""
+        orm = ""
+    else:
+        touchicon = ""
+        # favicon
+        f = open(iankiPath+'/static/favicon.ico', 'rb')
+        favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
+        f.close()
+        f = open(iankiPath+'/static/joose.mini.js')
+        joose = f.read()
+        f.close()
+        f = open(iankiPath+'/static/orm_async.js')
+        orm = f.read()
+        f.close()
+    f = open(iankiPath+'/static/mootools-1.2.1-core.js')
+    s1 = f.read()
+    f.close()
+    f = open(iankiPath+'/static/ianki.js')
+    s2 = f.read()
+    f.close()
+    f = open(iankiPath+'/templates/ianki.html')
+    iankiHTML = f.read()
+    f.close()
+
+    if makeSlim:
+        s2 = slimmer.js_slimmer(s2)
+
+    iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        
+    return iankiHTML
+
+class anki_direct:
+    def GET(self):
+        iankiHTML = geniAnki(self)
+        web.output(iankiHTML)
 
 class anki_install:
     def GET(self):
-        if (web.ctx.environ['HTTP_USER_AGENT'].lower().find('iphone') < 0) and (web.ctx.environ['HTTP_USER_AGENT'].lower().find('ipod') < 0):
-            iPhone = False
-        else:
-            iPhone = True
-
-        import base64
-        # css
-        f = open(iankiPath+'/static/base.css')
-        css = f.read()
-        f.close()
-
-        if iPhone:
-            f = open(iankiPath+'/static/anki-logo.png', 'rb')
-            touchicon = '<link rel="apple-touch-icon" href="data:image/png;base64,%s"/>' % base64.b64encode(f.read())
-            f.close()
-            favicon = ""
-            joose = ""
-            orm = ""
-        else:
-            touchicon = ""
-            # favicon
-            f = open(iankiPath+'/static/favicon.ico', 'rb')
-            favicon = '<link rel="shorcut icon" href="data:image/ico;base64,%s"/>' % base64.b64encode(f.read())
-            f.close()
-            f = open(iankiPath+'/static/joose.mini.js')
-            joose = f.read()
-            f.close()
-            f = open(iankiPath+'/static/orm_async.js')
-            orm = f.read()
-            f.close()
-        f = open(iankiPath+'/static/mootools-1.2.1-core.js')
-        s1 = f.read()
-        f.close()
-        f = open(iankiPath+'/static/ianki.js')
-        s2 = f.read()
-        f.close()
-        f = open(iankiPath+'/templates/ianki.html')
-        iankiHTML = f.read()
-        f.close()
-
-        if makeSlim:
-            s2 = slimmer.js_slimmer(s2)
-
-        iankiHTML = iankiHTML % {'version':ui.__version__, 'favicon':favicon, 'touchicon':touchicon, 'css':css, 'joose':joose, 'orm':orm, 'mootools':s1, 'ianki':s2, 'location':web.input(loc='').loc}
+        iankiHTML = geniAnki(self)
 
         #if makeSlim:
         #    iankiHTML = slimmer.xhtml_slimmer(iankiHTML)
 
         test64 = base64.b64encode(iankiHTML)
-        #import urllib
+        import urllib
         #testUrlencode = urllib.urlencode(magicHTML)
         #dataURL = r'<a href="data:text/html;charset=utf-8;base64,%s" >Click here</a>' % test64
         installHTML = r'''
@@ -138,12 +149,14 @@ class anki_install:
     </head>
     <body>
         <div align='center'>
-        <span style="font-size: 20px;">Bookmark the following link</span><br>
-        <a style="font-size: 32px;" href="data:text/html;charset=utf-8;base64,%(payload)s" >iAnki (%(version)s)</a>
+        <span style="font-size: 16px;">Bookmark the following link</span><br>
+        <a style="font-size: 32px;" href="data:text/html;charset=utf-8;base64,%(payload)s" >iAnki (%(version)s)</a><br><br>
+        <span style="font-size: 16px;">For Mobile, save the following</span><br>
+        <a style="font-size: 32px;" href="/anki/mobile.html?loc=%(location)s" >iAnki Mobile (%(version)s)</a>
         </div>
     </body>
 </html>
-''' % {'version':ui.__version__, 'payload':test64}
+''' % {'version':ui.__version__, 'payload':test64, 'location': urllib.quote(web.input(loc='').loc)}
         web.output(installHTML)
 
 '''

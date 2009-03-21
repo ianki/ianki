@@ -1062,10 +1062,12 @@ Deck.prototype.loadDeck = function() {
                 self.delay0 = deck.delay0;
                 self.delay1 = deck.delay1;
                 self.delay2 = deck.delay2;
+				
                 if(self.version < 15){
                     self.delay1 = deck.delay0;
                     self.delay2 = 0.0;
                 }
+				
                 // collapsing future cards
                 self.collapseTime = deck.collapseTime;
                 // 0 is random, 1 is by input date
@@ -1596,7 +1598,7 @@ Deck.prototype.initialize = function(isNewDeck){
 			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
 			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
 			
-			dbSql(tx,'alter table decks add column revCardOrder integer not null default 0');
+			//dbSql(tx,'alter table decks add column revCardOrder integer not null default 0');
 		    }
                 }
                 
