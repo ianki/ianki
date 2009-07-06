@@ -1321,9 +1321,7 @@ Deck.prototype.realSync = function(resCallback){
                                         dbTransaction(self.db,
                                             function(tx) {
                                                 finished();
-                                                self.loadDeck();
                                                 resCallback();
-                                                $('syncDeck').disabled = false;
                                             }
                                         );
                                     }
@@ -2030,6 +2028,73 @@ function request_send(send, url, callback)
     do_chunk('start', '');
 }
 
+IAnki.prototype.syncNextDeck = function(){
+    try {
+        var self = this;
+        
+        if(self.nextDeck < self.syncDecks.length)
+        {
+            var syncName = self.syncDecks[self.nextDeck];
+            self.nextDeck++;
+            
+            anki_log("Start sync deck: " + syncName);
+            
+            var deckQ;
+            dbTransaction(self.dbBase,
+                function(tx)
+                {
+                    deckQ = new dbSqlQ(tx,'SELECT * FROM decks \
+                                        WHERE name = ?', [syncName])
+                }
+            );
+            
+            dbTransaction(self.dbBase,
+                function(tx)
+                {
+                    anki_log("Check result");
+                    var isNewDeck = false;
+                    if(deckQ.result().rows.length == 0) {
+                        anki_log("Creating deck: " + syncName + " on client");
+                        dbSql(tx, 'INSERT INTO decks (name) values (?)', [syncName]);
+                        isNewDeck = true;
+                    }
+                    else {
+                        anki_log("Syncing existing deck: " + syncName + " on client");
+                    }
+                    
+                    // Set this deck as the current deck, and sync the deck
+                    self.currentDeck = syncName;
+                    dbSql(tx,'UPDATE settings SET currentDeck=?', [self.currentDeck]);
+                    self.deck = new Deck(syncName, isNewDeck);
+                    
+                    self.deck.realSync(
+                        function()
+                        {
+                            anki_log("syncNextDeck callback " + self.nextDeck + " of " + self.syncDecks.length);
+                            if(self.nextDeck < self.syncDecks.length) {
+                                self.syncNextDeck();
+                            }
+                            else {
+                                //self.loadDeck();
+                                self.deck.nextCard();
+                                $('syncDeck').disabled = false;
+                            }
+                        }
+                    );
+                }
+            );
+        }
+        else
+        {
+            $('syncDeck').disabled = false;
+        }
+    }
+    catch (e) {
+        anki_exception('IAnki.syncNextDeck exception:' + e);
+        $('syncDeck').disabled = false;
+    }
+}
+
 IAnki.prototype.syncDeck = function(mode){    
     try {
         var self = this;
@@ -2050,57 +2115,9 @@ IAnki.prototype.syncDeck = function(mode){
                     return;
                 }
                 
-                syncName = json['deck'];
-                anki_log("Deck: " + syncName);
-                
-                var deckQ;
-                dbTransaction(self.dbBase,
-                    function(tx)
-                    {
-                        deckQ = new dbSqlQ(tx,'SELECT * FROM decks \
-                                            WHERE name = ?', [syncName])
-                    }
-                );
-                
-                dbTransaction(self.dbBase,
-                    function(tx)
-                    {
-                        anki_log("Check result");
-                        var isNewDeck = false;
-                        if(deckQ.result().rows.length == 0) {
-                            anki_log("Creating deck: " + syncName + " on client");
-                            dbSql(tx, 'INSERT INTO decks (name) values (?)', [syncName]);
-                            isNewDeck = true;
-                        }
-                        else {
-                            anki_log("Syncing existing deck: " + syncName + " on client");
-                        }
-                        
-                        // Set this deck as the current deck, and sync the deck
-                        self.currentDeck = syncName;
-                        dbSql(tx,'UPDATE settings SET currentDeck=?', [self.currentDeck]);
-                        self.deck = new Deck(syncName, isNewDeck);
-                        
-                        if(mode == 0){
-                            self.deck.sync(
-                                function()
-                                {
-                                    $('syncDeck').disabled = false;
-                                    self.deck.nextCard();
-                                }
-                            );
-                        }
-                        else {
-                            self.deck.realSync(
-                                function()
-                                {
-                                    $('syncDeck').disabled = false;
-                                    self.deck.nextCard();
-                                }
-                            );
-                        }
-                    }
-                );
+                self.syncDecks = json['deck'];
+                self.nextDeck = 0;
+                self.syncNextDeck();
             }
             catch (e) {
                 anki_exception('syncCallback exception:' + e);

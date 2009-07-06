@@ -419,11 +419,13 @@ def procSync(inputData):
         try:
             if data['method'] == 'getdeck':
                 ui.logMsg('Sync started')
-                json['deck'] = ui.ankiQt.syncName
+                #json['deck'] = ui.ankiQt.syncName
+                json['deck'] = ui.sync_names
             elif data['method'] == 'realsync':
                 # ToDo: Error if syncName doesn't match the current deck
                 ui.logMsg('Syncing deck ' + data['syncName'])
-                deck = DeckStorage.Deck(ui.ankiQt.deckPath)
+                #deck = DeckStorage.Deck(ui.ankiQt.deckPath)
+                deck = DeckStorage.Deck(ui.sync_paths[ui.sync_names.index(data['syncName'])])
                 try:
                     deck.rebuildQueue()
                     # Apply client updates

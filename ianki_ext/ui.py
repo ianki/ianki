@@ -1,11 +1,12 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
 from ankiqt.forms.main import Ui_MainWindow
+from anki import DeckStorage
 import web
 import sys
 
@@ -15,6 +16,8 @@ urls = None
 glob = None
 sync_cards = 500
 sync_days = 1
+sync_paths = []
+sync_names = []
 
 class ThreadedProc:
     def __init__(self, proc, arg):
@@ -39,13 +42,14 @@ class IAnkiServerDialog(QtGui.QDialog):
     def __init__(self, parent):
         QtGui.QDialog.__init__(self, parent)
 
-        if parent.deck is None and parent.deckPath is None:
+        '''if parent.deck is None and parent.deckPath is None:
             # qt on linux incorrectly accepts shortcuts for disabled actions
             return
-
+        '''
         global ankiQt
         ankiQt = parent
 
+        '''
         if ankiQt.deck:
             # save first, so we can rollback on failure
             ankiQt.deck.save()
@@ -55,12 +59,17 @@ class IAnkiServerDialog(QtGui.QDialog):
             ankiQt.deck.close()
             ankiQt.deck = None
             ankiQt.loadAfterSync = True
+        '''
+        
+        ankiQt.saveAndClose(hideWelcome=True)
+        ankiQt.deck = None
+        ankiQt.moveToState("noDeck")
 
         #import gc; gc.collect()
         #self.bodyView.clearWindow()
         #self.bodyView.flush()
 
-        self.d = parent.deck
+        #self.d = parent.deck
         self.config = parent.config
         self.server = None
 
@@ -141,6 +150,40 @@ class IAnkiServerDialog(QtGui.QDialog):
         #self.useGears.setChecked(self.config['ianki_useGears'])
         #self.useGears.setText(_('Enable Gears'))
         #self.settingsLayout.addWidget(self.useGears)
+        
+        #d = QtGui.QCheckListItem(self, "hello", QCheckListItem.CheckBox)
+        
+        #self.deckList = QtGui.QListView(self)
+        #self.deckList.addColumn("Sync deck")
+        
+        ## Decks box
+        self.decksBox = QtGui.QGroupBox("Sync decks", self)
+        self.decksLayout = QtGui.QVBoxLayout(self.decksBox)
+        self.vboxlayout.addWidget(self.decksBox)
+        
+        if not 'ianki_decks' in self.config:
+            self.config['ianki_decks'] = []
+        
+        self.decks = []
+        for dp in self.config['recentDeckPaths']:
+            try:
+                deck = DeckStorage.Deck(dp)
+                try:
+                    syncName = deck.syncName
+                    if syncName != None:
+                        cb = QtGui.QCheckBox(syncName, self)
+                        if dp in self.config['ianki_decks']:
+                            cb.setCheckState(2)
+                        self.decks.append([cb, dp, syncName])
+                        self.decksLayout.addWidget(self.decks[-1][0])
+                finally:
+                    deck.close()
+            except:
+                pass
+        
+        #self.deckItems.append(QtGui.QCheckListItem(self.deckList, "hello", QCheckListItem.CheckBox))
+        
+        
 
         self.startButton = QtGui.QPushButton(self)
         self.startButton.setText(_("Start"))
@@ -165,6 +208,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.exec_()
 
         # Reopen after sync finished.
+        '''
         if ankiQt.loadAfterSync:
             ankiQt.loadDeck(ankiQt.deckPath, sync=False)
             ankiQt.deck.syncName = ankiQt.syncName
@@ -173,6 +217,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         else:
             ankiQt.moveToState("noDeck")
         ankiQt.deckPath = None
+        '''
         ankiQt = None
 
     #def useGearsChanged(self):
@@ -195,6 +240,9 @@ class IAnkiServerDialog(QtGui.QDialog):
         port = str(self.portEdit.text())
         global sync_cards
         global sync_days
+        global sync_paths
+        global sync_names
+        
         try:
             sync_cards = int(self.scards.text())
         except:
@@ -212,10 +260,16 @@ class IAnkiServerDialog(QtGui.QDialog):
         elif sync_days > 4:
             sync_days = 4
 
+        sync_paths = [d[1] for d in reversed(self.decks) if (d[0].checkState())]
+        sync_names = [d[2] for d in reversed(self.decks) if (d[0].checkState())]
+
         self.config['ianki_ip'] = ip
         self.config['ianki_port'] = port
         self.config['ianki_sync_cards'] = sync_cards
         self.config['ianki_sync_days'] = sync_days
+        self.config['ianki_decks'] = sync_paths
+        
+        #if deck.syncName in self.config['ianki_decks']:
 
         self.scards.setText(_(str(sync_cards)))
         self.sdays.setText(_(str(sync_days)))
