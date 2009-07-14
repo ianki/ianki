@@ -1034,7 +1034,11 @@ Deck.prototype.answerCard = function(ease){
                 // Update lastCardInfo
                 var dueIn = card.due - answerTime;
                 var next = timeString(dueIn);
-                $('lastCardInfo').innerHTML = ' <br>'+card.question+'<br>Will be shown again in '+next+'.';
+                var q = card.question;
+                q = stripTag(q, 'img');
+                q = stripTag(q, 'div');
+                q = stripTag(q, 'span');
+                $('lastCardInfo').innerHTML = ' <br>'+q+'<br>Will be shown again in '+next+'.';
                 
 				// Finally after all the previous transactions are finished, show the next card.
 				self.nextCard();
