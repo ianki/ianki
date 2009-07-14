@@ -5,6 +5,9 @@ body {
 	margin:0;
 	padding:0;
 }
+BODY .chrome {
+  display: None;
+}
 h1 {
 	font-family: "arial";
 	font-size:12px;
@@ -41,4 +44,7 @@ input {
 }
 .red {
 	color: red;
+}
+#deckTable TD {
+        padding: 5px;
 }

@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -282,6 +282,7 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.startButton.setEnabled(False)
             self.stopButton.setEnabled(True)
             self.settingsBox.setEnabled(False)
+            self.decksBox.setEnabled(False)
             self.logText.append('Server started.')
         else:
             self.logText.append('Failed to start server.')
@@ -296,6 +297,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         queryRunner = None
         self.startButton.setEnabled(True)
         self.settingsBox.setEnabled(True)
+        self.decksBox.setEnabled(True)
 
     def closeClicked(self):
         self.close()

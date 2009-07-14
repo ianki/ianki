@@ -87,6 +87,10 @@ def geniAnki(self):
     f = open(iankiPath+'/static/base.css')
     css = f.read()
     f.close()
+    if iPhone:
+        f = open(iankiPath+'/static/iphone.css')
+        css += f.read()
+        f.close()
 
     if iPhone:
         f = open(iankiPath+'/static/anki-logo.png', 'rb')
@@ -483,6 +487,10 @@ def procSync(inputData):
                     cardIdIndex = cardFields.index('id')
                     cardFactIdIndex = cardFields.index('factId')
                     cardModifiedIndex = cardFields.index('modified')
+                    cardModelIdIndex = cardFields.index('cardModelId')
+                    cardQuestionIndex = cardFields.index('question')
+                    cardAnswerIndex = cardFields.index('answer')
+                    
                     factFields = tables['facts']
                     factIdIndex = factFields.index('id')
                     factModelIdIndex = factFields.index('modelId')
@@ -570,6 +578,17 @@ def procSync(inputData):
                     updateCards = [[],[],[]] # modify, add, remove
                     updateFacts = [[],[],[]] # modify, add, remove
                     updateModels = [[],[],[]] # modify, add, remove
+                    
+                    pickTemp = pickCards
+                    pickCards = []
+                    for c in pickTemp:
+                        # convert rows to lists
+                        c = [x for x in c]
+                        # get html formatted q&a
+                        card = deck.s.query(cards.Card).get(c[cardIdIndex])
+                        c[cardQuestionIndex] = card.htmlQuestion()
+                        c[cardAnswerIndex] = card.htmlAnswer()
+                        pickCards.append(c)
 
                     pickFacts = {}
                     for card in pickCards:
@@ -625,6 +644,7 @@ def procSync(inputData):
                         json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
                     json['numUpdates'] = countUpdates()
                     json['updates'] = getUpdate(200)
+                    json['deckcss'] = deck.css
                     #printUpdate(json['updates'])
                     #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                 finally:

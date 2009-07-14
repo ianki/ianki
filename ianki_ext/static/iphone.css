@@ -1,0 +1,66 @@
+body {
+	background-color: #000;
+	color: #FFF;
+}
+BODY .chrome {
+	font-family: Tahoma, Arial,Helvetica,sans-serif;
+	font-size: 30px;
+	height: 34px;
+	padding: 7px 0px;
+	text-align: center;
+	vertical-align: center;
+	background-color: #385998;
+	color: #FFFFFF;
+        display: block;
+}
+h1 {
+	font-family: Tahoma, Arial,Helvetica,sans-serif;
+	padding: 5px 10px;
+	border-top: 1px solid #ABCBDE;
+	background-color: #385998;
+	color: #FFFFFF;
+	border-bottom: none;
+        margin-top: 0px;
+}
+h1 button {
+	font-size: 14px;
+}
+#contents {
+	border-top: 1px solid #ACBCDE;
+	border-bottom: 1px solid #005E96;
+	background-color: #6084B4;
+	color: #FFFFFF;
+}
+#reviewContent {
+	border-top: 1px solid #000000;
+	border-left: 1px solid #000000;
+	border-right: 1px solid #000000;
+	border-bottom: 1px solid #000000;
+	margin: 12px 20px;
+	padding: 5px 5px 5px 5px;
+	background-color: #FFFFFF;
+}
+#question, #answer {
+	color: #000000;
+	padding: 0px;
+    text-align: center;
+}
+#info {
+	margin: 0px 16px;
+	padding-bottom: 10px;
+}
+#deckTable table {
+	border-bottom: 1px solid black;
+	background-color: #FFFFFF;
+        width: 90%;
+	color: #000000;
+}
+#deckTable td {
+	border-top: 1px solid black;
+	padding: 5px 0px;
+}
+#deckTable a {
+	padding: 0px 10px;
+	text-decoration: none;
+	color: #000000;
+}

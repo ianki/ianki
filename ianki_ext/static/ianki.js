@@ -8,6 +8,65 @@ var autoSync = 0;
 var iAnki;
 var iAnkiDebug = false;
 
+// Remove additional spaces and replaces newlines and tabs.
+function condenseSpaces(text) {
+  var l = text.length;
+  var i = 0;
+  var r = '';
+  last_ch = '';
+  while (i < l) {
+    ch = text[i];
+    if (ch == '\n' || ch == '\t') { ch = ' '; }
+    if (ch != ' ' || last_ch != ' ') {
+      r += ch;
+    }
+    last_ch = ch;
+    ++i;
+  }
+  return r;
+}
+
+// Removes extra line breaks.
+function stripEmptyLines(text) {
+  var out = text;
+  var last = '';
+  while (last != out) {
+    last = out;
+    out = out.replace('<br><br>', '<br>');
+  }
+  return out;
+}
+
+function stripTag(text, tag) {
+  var out = text;
+  var last = '';
+  while(last != out) {
+    last = out;
+    var i = out.indexOf('<' + tag);
+    if (i >= 0) {
+      var front = out.substr(0, i);
+      var rest = out.substr(i+1);
+      var back = rest.substr(rest.indexOf('>')+1);
+      out = front + back;
+    }
+  }
+  return out;
+}
+
+// Format questions and answers text.
+function formatQA(text) {
+  var out = text;
+
+  // Images are not supported on the phone: remove img tags.
+  out = stripTag(out, 'img');
+  // Remove extra spaces and newlines.
+  //out = condenseSpaces(out);
+  // Remove empty lines.
+  //out = stripEmptyLines(out);
+
+  return out;
+}
+
 function anki_log(str){
     if(iAnkiDebug){
         try {
@@ -558,6 +617,7 @@ Deck.prototype.showAnswer = function(){
         anki_log('Deck.showAnswer')
         $('showAnswerDiv').style.display='none';
         $('answerSide').style.display='block';
+        $('answerButtons').style.display='block';
     }
     catch(e){
 		anki_exception('Deck.showAnswer Exception:' + e);
@@ -998,10 +1058,11 @@ Deck.prototype.nextCard = function() {
 		function(card){
             if(card != null){
                 self.currCard = new cloneObject(card);
-                $('question').innerHTML = (( self.currCard.question ));
-                $('answer').innerHTML = (( self.currCard.answer ));
+                $('question').innerHTML = formatQA(( self.currCard.question ));
+                $('answer').innerHTML = formatQA(( self.currCard.answer ));
                 $('showAnswerDiv').style.display = 'block';
                 $('answerSide').style.display = 'none';
+                $('answerButtons').style.display = 'none';
 
                 self.currCard.startTime = nowInSeconds();
                 
@@ -1042,12 +1103,13 @@ Deck.prototype.nextCard = function() {
 Deck.prototype.loadDeck = function() {
     anki_log("Deck.loadDeck");
     var self = this;
-    var deckQ;
+    var deckQ, extraQ;
     var averageFactorQ;
     dbTransaction(self.db,
         function(tx) {
             deckQ = new dbSqlQ(tx, 'SELECT * FROM decks LIMIT 1');
             averageFactorQ = new dbSqlQ(tx, 'select avg(factor) from cards where reps > 0');
+            extraQ = new dbSqlQ(tx, 'SELECT * FROM extra LIMIT 1');
         }
     );
     
@@ -1085,6 +1147,15 @@ Deck.prototype.loadDeck = function() {
                 self.averageFactor = averageFactorQ.result().rows.item(0)['avg(factor)'];
             else
                 self.averageFactor = self.initialFactor;
+                
+            if(extraQ.result().rows.length > 0) {
+                var extra = extraQ.result().rows.item(0);
+                var css = document.createElement('link'); 
+                css.rel = 'stylesheet';
+                css.type = 'text/css';
+                css.href = "data:text/css;charset=utf-8," + escape(extra.css);
+                document.head.appendChild(css);
+            }
         }
     );
 }
@@ -1203,6 +1274,28 @@ Deck.prototype.realSync = function(resCallback){
                         dbTransaction(self.db,
                             function(tx) {
                                 dbSql(tx, 'DELETE FROM reviewHistory',[]);
+                            }
+                        );
+
+                        var deckcss = realSyncJson['deckcss'];
+                        anki_log('deckcss<br>'+deckcss);
+                        
+                        // Get deck settings
+                        var extraQ;
+                        dbTransaction(self.db,
+                            function(tx) {
+                                extraQ = new dbSqlQ(tx, 'SELECT * FROM extra',[]);
+                            }
+                        );
+                        
+                        dbTransaction(self.db,
+                            function(tx) {
+                                if(extraQ.result().rows.length == 0){
+                                    dbSql(tx, 'INSERT INTO extra (css) VALUES (?)',[deckcss]);
+                                }
+                                else {
+                                    dbSql(tx, 'UPDATE extra SET css=?',[deckcss]);
+                                }
                             }
                         );
                         
@@ -1560,51 +1653,18 @@ Deck.prototype.initialize = function(isNewDeck){
                                 PRIMARY KEY (id) \
                                 )');                
                 syncTimesQ = new dbSqlQ(tx, 'SELECT * FROM syncTimes LIMIT 1');
+                
+                dbSql(tx,'CREATE TABLE IF NOT EXISTS extra ( \
+								id INTEGER NOT NULL,  \
+								"css" TEXT DEFAULT "",  \
+                                PRIMARY KEY (id) \
+                                )');
             }
         );
         
         dbTransaction(self.db,
 			function(tx)
-			{
-                // Drop old views & indices from decks with older versions
-                if(syncTimesQ.result().rows.length > 0) {
-                    var sync = syncTimesQ.result().rows.item(0);
-                    var version = 0.0;
-                    if(sync.version)
-                        version = sync.version;
-                    else
-                        dbSql(tx,'ALTER TABLE syncTimes ADD version NUMERIC DEFAULT 0.0000');                    
-                    if(version < 0.22) {
-                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsOrdered');
-                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
-                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsNow');
-                        dbSql(tx,'DROP VIEW IF EXISTS failedCards');
-                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsSoon');
-                        dbSql(tx,'DROP VIEW IF EXISTS revCards');
-                        
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_markExpired');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedIsDue');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedOrder');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newOrderedOrder');
-                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_factId');
-                    }
-		    if(version < 0.25) {
-			dbSql(tx,'DROP VIEW IF EXISTS revCards');
-			dbSql(tx,'DROP VIEW IF EXISTS revCardsOld');
-			dbSql(tx,'DROP VIEW IF EXISTS revCardsNew');
-			dbSql(tx,'DROP VIEW IF EXISTS revCardsDue');
-			dbSql(tx,'DROP VIEW IF EXISTS revCardsRandom');
-			dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
-			
-			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
-			dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
-			
-			//dbSql(tx,'alter table decks add column revCardOrder integer not null default 0');
-		    }
-                }
-                
+			{               
                 // Unfortunatly the ids in Anki's tables are 64bit ints, which aren't handled correctly
                 // in JS, so I've changed them all to TEXT to preserve them.
 				dbSql(tx,'CREATE TABLE IF NOT EXISTS decks ( \
@@ -1722,6 +1782,50 @@ Deck.prototype.initialize = function(isNewDeck){
                 
                 // Stats have been disabled
                 dbSql(tx, 'DROP TABLE IF EXISTS stats');
+                
+                                // Drop old views & indices from decks with older versions
+                if(syncTimesQ.result().rows.length > 0) {
+                    var sync = syncTimesQ.result().rows.item(0);
+                    var version = 0.0;
+                    if(sync.version)
+                        version = sync.version;
+                    else
+                        dbSql(tx,'ALTER TABLE syncTimes ADD version NUMERIC DEFAULT 0.0000');                    
+                    if(version < 0.22) {
+                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsOrdered');
+                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsNow');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCards');
+                        dbSql(tx,'DROP VIEW IF EXISTS failedCardsSoon');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCards');
+                        
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_markExpired');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedIsDue');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_failedOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newOrderedOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_factId');
+                    }
+                    if(version < 0.25) {
+                        dbSql(tx,'DROP VIEW IF EXISTS revCards');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCardsOld');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCardsNew');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCardsDue');
+                        dbSql(tx,'DROP VIEW IF EXISTS revCardsRandom');
+                        dbSql(tx,'DROP VIEW IF EXISTS acqCardsRandom');
+                        
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_newRandomOrder');
+                        dbSql(tx,'DROP INDEX IF EXISTS ix_cards_revisionOrder');
+                        
+                        //dbSql(tx,'alter table decks add column revCardOrder integer not null default 0');
+                    }
+                }
+                else
+                {
+                    dbSql(tx, 'INSERT INTO syncTimes (lastSyncHost, lastSyncClient) VALUES (?,?)',[0, 0]);
+                }
+                
                 /*
 				dbSql(tx, 'CREATE TABLE IF NOT EXISTS stats ( \
 								id TEXT NOT NULL,  \
@@ -1828,7 +1932,7 @@ Deck.prototype.initialize = function(isNewDeck){
                 dbSql(tx,'create index if not exists ix_cards_failedOrder on cards \
                         (type, isDue, due)');    
                  
-                dbSql(tx,'UPDATE syncTimes SET version=?', [0.25]);
+                dbSql(tx,'UPDATE syncTimes SET version=?', [0.32]);
 			}
 		);
         
@@ -2203,19 +2307,19 @@ IAnki.prototype.chooseDeck = function(really){
         dbTransaction(self.dbBase,
             function(tx)
             {
-                var rows = "<table style='font-size: 20px; margin: 16px'>";
+                var rows = "<table cellpadding=0 cellspacing=0 style='font-size: 20px; margin: 16px'>";
                 var result = deckQ.result();
                 if(result.rows.length > 0){
                     for(var d = 0; d < result.rows.length; d++){
                         var name = result.rows.item(d).name;
                         rows += "<tr>"
-                        rows += "<td><a style='color:#0000C0' onclick='iAnki.setDeck(\"" + name + "\")'><u>"+name+"</u></a></td> ";
-                        rows += "<td><a style='color:#0000C0'onclick='iAnki.chooseDeck(\"" + name + "\")'><u>Delete</u></a> ";
+                        rows += "<td><a onclick='iAnki.setDeck(\"" + name + "\")'>"+name+"</a></td> ";
                         if(name == really) {
-                            rows += "<span>Sure? </span> "
-                            rows += "<a style='color:#0000C0' onclick='iAnki.deleteDeck(\"" + name + "\")'><u>Yes</u></a>";
+                            rows += "<td align=right><a onclick='iAnki.deleteDeck(\"" + name + "\")'>Confirm?</a></td>";
+                        } else {
+                            rows += "<td align=right><a onclick='iAnki.chooseDeck(\"" + name + "\")'>Delete</a></td>";
                         }
-                        rows += "</td></tr>";
+                        rows += "</tr>";
                     }
                     rows += '</table>';
                     $('deckTable').innerHTML = rows;
