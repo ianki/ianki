@@ -474,6 +474,91 @@ Deck.prototype.getFailedCardNow = function(tx, resCallback){
 	);
 }
 
+Deck.prototype.getNextCardNew = function(resCallback){
+    var self = this;
+    var failedNowQ;
+    var revNowQ;
+    var newNowQ;
+    
+    anki_log('Deck.getNextCardNew');
+    
+    dbTransaction(self.db,
+		function(tx)
+		{
+            // First start queries for failed, due and new cards.
+            failedNowQ = new dbSqlQ(tx,'select * from "failedCardsNow"', [] );
+            
+            var revQuery;
+            if(self.revCardOrder == 0)
+                revQuery = 'select * from "revCardsOld" limit 1';
+            else if(self.revCardOrder == 1)
+                revQuery = 'select * from "revCardsNew" limit 1';
+            else if(self.revCardOrder == 2)
+                revQuery = 'select * from "revCardsDue" limit 1';
+            else
+                revQuery = 'select * from "revCardsRandom" limit 1';
+                
+            revNowQ = new dbSqlQ(tx, revQuery, [] );
+            
+            var newQuery;
+            if(self.newCardOrder == 0)
+                newQuery = 'select * from "acqCardsRandom" limit 1';
+            else
+                newQuery = 'select * from "acqCardsOrdered" limit 1';
+                
+            newNowQ = new dbSqlQ(tx, newQuery, [] );
+        }
+    );
+    
+    dbTransaction(self.db,
+		function(tx)
+		{
+            // At this point the above queries are finished so they
+            // can be read, and the following (mostly) implements
+            // Anki's Deck.getCardId algorithm.
+            
+            // # failed card due?
+            // if self.delay0 and self.failedNowCount:
+            if(self.delay0 > 0 && failedNowQ.result().rows.length > 0) {
+                resCallback(new cloneObject(failedNowQ.result().rows.item(0)));
+                return;
+            }
+            
+            // # failed card queue too big?   
+            // if (self.failedCardMax and self.failedSoonCount >= self.failedCardMax):
+            // Optimize this using a count query 'select count(id) from "failedCards"'
+            if(self.failedCardMax > 0 && failedNowQ.result().rows.length >= self.failedCardMax) {
+                resCallback(new cloneObject(failedNowQ.result().rows.item(0)));
+                return;
+            }
+            
+            // # distribute new cards? (ToDo)
+            
+            // # card due for review?
+            if(revNowQ.result().rows.length > 0) {
+                resCallback(new cloneObject(revNowQ.result().rows.item(0)));
+                return;
+            }
+            
+            // # new cards left?
+            if(newNowQ.result().rows.length > 0) {
+                resCallback(new cloneObject(newNowQ.result().rows.item(0)));
+                return;
+            }
+            
+            // # display failed cards early/last
+            // if self.collapseTime or not self.delay0:
+            if((self.collapseTime || self.delay0 == 0) && failedNowQ.result().rows.length > 0) {
+                resCallback(new cloneObject(failedNowQ.result().rows.item(0)));
+                return;
+            }
+            
+            // No cards to review.
+            resCallback(null);
+        }
+    );
+}
+
 Deck.prototype.getNextCard = function(resCallback){
 	var self = this;
 	self.markExpiredCardsDue();
@@ -488,6 +573,23 @@ Deck.prototype.getNextCard = function(resCallback){
             newCount = c;
         }
     );
+    
+    function cardCallback(card) {
+        function under(x, b){
+            if(b)
+                return '<u>'+x+'</u>';
+            else
+                return x;
+        }
+        if(card) {
+            iAnki.setTitle(versionTitle + '<br>'+self.syncName +' '+under(failedCount, card.type==0)+' '+under(reviewCount, card.type==1)+' '+under(newCount, card.type==2));
+        }
+        resCallback(card);
+    }
+    
+    self.getNextCardNew(cardCallback);
+    
+    /*
 	dbTransaction(self.db,
 		function(tx)
 		{
@@ -512,6 +614,7 @@ Deck.prototype.getNextCard = function(resCallback){
 			}
 		}
 	);
+    */
 }
 
 Deck.prototype.nextDue = function(card, ease, oldState){
@@ -1032,13 +1135,20 @@ Deck.prototype.answerCard = function(ease){
 							set modified = ?',[answerTime]);
                 
                 // Update lastCardInfo
-                var dueIn = card.due - answerTime;
-                var next = timeString(dueIn);
-                var q = card.question;
+                                var q = card.question;
                 q = stripTag(q, 'img');
                 q = stripTag(q, 'div');
                 q = stripTag(q, 'span');
-                $('lastCardInfo').innerHTML = ' <br>'+q+'<br>Will be shown again in '+next+'.';
+                
+                if(ease < 2 && self.delay0 == 0) {
+                    $('lastCardInfo').innerHTML = ' <br>'+q+'<br>Will be shown again at the end.';
+                }
+                else {
+                    var dueIn = card.due - answerTime;
+                    var next = timeString(dueIn);
+                    $('lastCardInfo').innerHTML = ' <br>'+q+'<br>Will be shown again in '+next+'.';
+                }
+                
                 
 				// Finally after all the previous transactions are finished, show the next card.
 				self.nextCard();
@@ -1133,17 +1243,23 @@ Deck.prototype.loadDeck = function() {
                 self.delay0 = deck.delay0;
                 self.delay1 = deck.delay1;
                 self.delay2 = deck.delay2;
+                
+                self.failedCardMax = deck.failedCardMax;
 				
                 if(self.version < 15){
                     self.delay1 = deck.delay0;
                     self.delay2 = 0.0;
                 }
+                
+                anki_log("delay0 " + self.delay0);
+                anki_log("delay1 " + self.delay1);
+                anki_log("delay2 " + self.delay2);
 				
                 // collapsing future cards
                 self.collapseTime = deck.collapseTime;
                 // 0 is random, 1 is by input date
                 self.newCardOrder = deck.newCardOrder;
-		self.revCardOrder = deck.revCardOrder;
+                self.revCardOrder = deck.revCardOrder;
                 // when to show new cards
                 self.newCardSpacing = deck.newCardSpacing;
             }
