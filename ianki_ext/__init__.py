@@ -11,6 +11,7 @@ import os
 import sys
 import time
 import slimmer
+import re
 
 import ui
 reload( sys.modules['ianki_ext.ui'] )
@@ -45,6 +46,7 @@ import web
 import simplejson
 from anki import DeckStorage, cards
 from anki.stats import dailyStats, globalStats
+from anki.hooks import runFilter
 
 urls = (
   '/', 'index',
@@ -411,7 +413,7 @@ def printUpdate(up):
             print >>  sys.stderr, t, "added"
             for i in update[t]['added']:
                 print >>  sys.stderr, "  ", i
-
+   
 def procSync(inputData):
     json = {}
     json['error'] = 0
@@ -586,8 +588,12 @@ def procSync(inputData):
                         c = [x for x in c]
                         # get html formatted q&a
                         card = deck.s.query(cards.Card).get(c[cardIdIndex])
-                        c[cardQuestionIndex] = card.htmlQuestion()
-                        c[cardAnswerIndex] = card.htmlAnswer()
+                        q = card.htmlQuestion()
+                        a = card.htmlAnswer()
+                        q = runFilter("drawQuestion", q, card)
+                        a = runFilter("drawAnswer", a, card)
+                        c[cardQuestionIndex] = q
+                        c[cardAnswerIndex] = a
                         pickCards.append(c)
 
                     pickFacts = {}
@@ -644,7 +650,17 @@ def procSync(inputData):
                         json[t+'_sql_update'] = 'UPDATE ' + t + ' SET ' + getSetList(tables[t]) + ' WHERE id = ?'
                     json['numUpdates'] = countUpdates()
                     json['updates'] = getUpdate(200)
-                    json['deckcss'] = deck.css
+                    
+                    #font-size:%dpx
+                    css = deck.css
+                    try:
+                        css = runFilter("addStyles", css, None)
+                    except:
+                        pass
+                    
+                    json['deckcss'] = css
+                    #ui.logMsg(' css\n %s' % json['deckcss'])
+                    
                     #printUpdate(json['updates'])
                     #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                 finally:
