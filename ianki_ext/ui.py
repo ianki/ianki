@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.4.4"
+__version__ = "0.4.5"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -190,12 +190,11 @@ class IAnkiServerDialog(QtGui.QDialog):
                             cb.setCheckState(2)
                         self.decks.append([cb, dp, syncName])
                         self.decksLayout.addWidget(self.decks[-1][0])
-                except Exception, e:
-                    raise
-                finally:
-                    deck.close()
+                except:
+                    pass
+                deck.close()
             except:
-                raise
+                pass
         
         #self.deckItems.append(QtGui.QCheckListItem(self.deckList, "hello", QCheckListItem.CheckBox))
         
