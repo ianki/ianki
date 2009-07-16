@@ -414,6 +414,11 @@ def printUpdate(up):
             for i in update[t]['added']:
                 print >>  sys.stderr, "  ", i
    
+def changeFontScale(matchobj):
+    sz = int(matchobj.groups()[0])
+    #return "font-size:%0.2f%%" % (100 * sz / 40.0)
+    return "font-size:%0.2fpx" % (sz * (ui.font_scaling / 100.0))
+
 def procSync(inputData):
     json = {}
     json['error'] = 0
@@ -651,12 +656,13 @@ def procSync(inputData):
                     json['numUpdates'] = countUpdates()
                     json['updates'] = getUpdate(200)
                     
-                    #font-size:%dpx
                     css = deck.css
                     try:
                         css = runFilter("addStyles", css, None)
                     except:
                         pass
+                    
+                    css = re.sub("font-size:([0-9]+)px", changeFontScale, css)
                     
                     json['deckcss'] = css
                     #ui.logMsg(' css\n %s' % json['deckcss'])

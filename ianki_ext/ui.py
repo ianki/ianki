@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.4.3"
+__version__ = "0.4.4"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -16,6 +16,7 @@ urls = None
 glob = None
 sync_cards = 500
 sync_days = 1
+font_scaling = 100
 sync_paths = []
 sync_names = []
 
@@ -82,6 +83,8 @@ class IAnkiServerDialog(QtGui.QDialog):
             self.config['ianki_sync_cards'] = sync_cards
         if 'ianki_sync_days' not in self.config:
             self.config['ianki_sync_days'] = sync_days
+        if 'ianki_font_scaling' not in self.config:
+            self.config['ianki_font_scaling'] = font_scaling
 
         global deckQueryRunner
         deckQueryRunner = self
@@ -120,19 +123,30 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.slayout.setObjectName("iplayout")
         self.slayout.addWidget(QtGui.QLabel(_('Max cards'), self))
         self.scards = QtGui.QLineEdit(self)
-        self.scards.setObjectName("ipEdit")
+        self.scards.setObjectName("cardsEdit")
         self.scards.setText(_(self.config['ianki_sync_cards']))
         self.scards.setMinimumSize(50, 20)
         self.slayout.addWidget(self.scards)
         self.slayout.addWidget(QtGui.QLabel(_('Days of reviews'), self))
         self.sdays = QtGui.QLineEdit(self)
-        self.sdays.setObjectName("portEdit")
+        self.sdays.setObjectName("daysEdit")
         self.sdays.setText(_(self.config['ianki_sync_days']))
         self.sdays.setMinimumSize(50, 20)
         self.slayout.addWidget(self.sdays)
+        
+        # Scaling
+        self.scalelayout = QtGui.QHBoxLayout(self)
+        self.scalelayout.setObjectName("iplayout")
+        self.scalelayout.addWidget(QtGui.QLabel(_('Font scaling (%)'), self))
+        self.fontScale = QtGui.QLineEdit(self)
+        self.fontScale.setObjectName("scaleEdit")
+        self.fontScale.setText(_(self.config['ianki_font_scaling']))
+        self.fontScale.setMinimumSize(50, 20)
+        self.scalelayout.addWidget(self.fontScale)
 
         self.settingsLayout.addLayout(self.iplayout)
         self.settingsLayout.addLayout(self.slayout)
+        self.settingsLayout.addLayout(self.scalelayout)
 
         # Todo: add card sync parameter settings
         '''
@@ -176,10 +190,12 @@ class IAnkiServerDialog(QtGui.QDialog):
                             cb.setCheckState(2)
                         self.decks.append([cb, dp, syncName])
                         self.decksLayout.addWidget(self.decks[-1][0])
+                except Exception, e:
+                    raise
                 finally:
                     deck.close()
             except:
-                pass
+                raise
         
         #self.deckItems.append(QtGui.QCheckListItem(self.deckList, "hello", QCheckListItem.CheckBox))
         
@@ -242,6 +258,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         global sync_days
         global sync_paths
         global sync_names
+        global font_scaling
         
         try:
             sync_cards = int(self.scards.text())
@@ -251,6 +268,11 @@ class IAnkiServerDialog(QtGui.QDialog):
             sync_days = int(self.sdays.text())
         except:
             sync_days = 1
+        try:
+            font_scaling = int(self.fontScale.text())
+        except:
+            font_scaling = 100
+        
         if sync_cards < 1:
             sync_cards = 1
         elif sync_cards > 1000:
@@ -259,6 +281,10 @@ class IAnkiServerDialog(QtGui.QDialog):
             sync_days = 1
         elif sync_days > 4:
             sync_days = 4
+        if font_scaling < 10:
+            font_scaling = 10
+        elif font_scaling > 1000:
+            font_scaling = 1000
 
         sync_paths = [d[1] for d in reversed(self.decks) if (d[0].checkState())]
         sync_names = [d[2] for d in reversed(self.decks) if (d[0].checkState())]
@@ -268,6 +294,7 @@ class IAnkiServerDialog(QtGui.QDialog):
         self.config['ianki_sync_cards'] = sync_cards
         self.config['ianki_sync_days'] = sync_days
         self.config['ianki_decks'] = sync_paths
+        self.config['ianki_font_scaling'] = font_scaling
         
         #if deck.syncName in self.config['ianki_decks']:
 
