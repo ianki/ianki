@@ -12,6 +12,7 @@ import sys
 import time
 import slimmer
 import re
+import traceback
 
 import ui
 reload( sys.modules['ianki_ext.ui'] )
@@ -437,6 +438,15 @@ def procSync(inputData):
                 ui.logMsg('Syncing deck ' + data['syncName'])
                 #deck = DeckStorage.Deck(ui.ankiQt.deckPath)
                 deck = DeckStorage.Deck(ui.sync_paths[ui.sync_names.index(data['syncName'])])
+        
+                if deck == None:
+                    json['error'] = 1
+                    json['exception'] = str(e)
+                    print >> sys.stderr, "Error", e
+                    ui.logMsg('There were errors during sync.')
+                    res = simplejson.dumps(json, ensure_ascii=False)
+                    return res
+                
                 try:
                     deck.rebuildQueue()
                     # Apply client updates
@@ -595,8 +605,11 @@ def procSync(inputData):
                         card = deck.s.query(cards.Card).get(c[cardIdIndex])
                         q = card.htmlQuestion()
                         a = card.htmlAnswer()
-                        q = runFilter("drawQuestion", q, card)
-                        a = runFilter("drawAnswer", a, card)
+                        try:
+                            q = runFilter("drawQuestion", q, card)
+                            a = runFilter("drawAnswer", a, card)
+                        except:
+                            pass
                         c[cardQuestionIndex] = q
                         c[cardAnswerIndex] = a
                         pickCards.append(c)
@@ -687,10 +700,10 @@ def procSync(inputData):
             pass
     #finally:
     #    pass
-    except Exception, e:
+    except:
         json['error'] = 1
-        json['exception'] = str(e)
-        print >> sys.stderr, "Exception", e
+        json['exception'] = traceback.format_exc()
+        print >> sys.stderr, json['exception']
         ui.logMsg('There were errors during sync.')
     #print >> sys.stderr, "response"
     #pretty.pretty(json)
