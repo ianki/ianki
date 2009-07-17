@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.4.5"
+__version__ = "0.4.6"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
