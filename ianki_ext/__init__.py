@@ -418,6 +418,9 @@ def changeFontScale(matchobj):
     #return "font-size:%0.2f%%" % (100 * sz / 40.0)
     return "font-size:%0.2fpx" % (sz * (ui.font_scaling / 100.0))
 
+def dummy_requeueCard(a, b):
+    pass
+
 def procSync(inputData):
     json = {}
     json['error'] = 0
@@ -428,7 +431,7 @@ def procSync(inputData):
         #pretty.pretty(data)
         try:
             if data['method'] == 'getdeck':
-                ui.logMsg('Sync started')
+                ui.logMsg(' ')
                 #json['deck'] = ui.ankiQt.syncName
                 json['deck'] = ui.sync_names
             elif data['method'] == 'realsync':
@@ -444,8 +447,11 @@ def procSync(inputData):
                     res = simplejson.dumps(json, ensure_ascii=False)
                     return res
                 
+                old_requeueCard = deck.requeueCard
+                deck.requeueCard = dummy_requeueCard
+                
                 try:
-                    deck.rebuildQueue()
+                    #deck.rebuildQueue()
                     # Apply client updates
                     if len(data['reviewHistory']) > 0:
                         ui.logMsg(' Applying %d new reviews' % len(data['reviewHistory']))
@@ -696,6 +702,7 @@ def procSync(inputData):
                     #printUpdate(json['updates'])
                     #ui.logMsg(' Sending %d items' % (json['updates']['numUpdates']))
                 finally:
+                    deck.requeueCard = old_requeueCard
                     deck.rebuildCounts()
                     deck.modified = time.time()
                     deck.save()

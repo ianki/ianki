@@ -1,7 +1,7 @@
 # Copyright (C) 2008 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 from PyQt4 import QtCore, QtGui
 from ankiqt.ui.main import AnkiQt
@@ -9,6 +9,7 @@ from ankiqt.forms.main import Ui_MainWindow
 from anki import DeckStorage
 import web
 import sys
+import os
 
 ankiQt = None
 deckQueryRunner = None
@@ -38,6 +39,10 @@ def logMsg(msg):
     def addLog(self, msg):
         self.logText.append(msg)
     ThreadedProc(addLog, msg)
+    
+    
+def deckName(deck):
+    return os.path.basename(deck.path).replace(".anki", "")
 
 class IAnkiServerDialog(QtGui.QDialog):
     def __init__(self, parent):
@@ -183,7 +188,7 @@ class IAnkiServerDialog(QtGui.QDialog):
             try:
                 deck = DeckStorage.Deck(dp)
                 try:
-                    syncName = deck.syncName
+                    syncName = deckName(deck)
                     if syncName != None:
                         cb = QtGui.QCheckBox(syncName, self)
                         if dp in self.config['ianki_decks']:
