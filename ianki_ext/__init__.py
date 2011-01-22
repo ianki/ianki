@@ -90,7 +90,7 @@ def geniAnki(self):
     f = open(iankiPath+'/static/base.css')
     css = f.read()
     f.close()
-    if iPhone:
+    if True: #iPhone
         f = open(iankiPath+'/static/iphone.css')
         css += f.read()
         f.close()
@@ -157,9 +157,7 @@ class anki_install:
     <body>
         <div align='center'>
         <span style="font-size: 16px;">Bookmark the following link</span><br>
-        <a style="font-size: 32px;" href="data:text/html;charset=utf-8;base64,%(payload)s" >iAnki (%(version)s)</a><br><br>
-        <span style="font-size: 16px;">For Mobile, save the following</span><br>
-        <a style="font-size: 32px;" href="/anki/mobile.html?loc=%(location)s" >iAnki Mobile (%(version)s)</a>
+        <a style="font-size: 32px;" href="/anki/mobile.html?loc=%(location)s" >iAnki (%(version)s)</a>
         </div>
     </body>
 </html>
@@ -441,9 +439,8 @@ def procSync(inputData):
         
                 if deck == None:
                     json['error'] = 1
-                    json['exception'] = str(e)
-                    print >> sys.stderr, "Error", e
-                    ui.logMsg('There were errors during sync.')
+                    json['exception'] = "Could not open deck: %s" % data['syncName'];
+                    ui.logMsg("Could not open deck: %s" % data['syncName'])
                     res = simplejson.dumps(json, ensure_ascii=False)
                     return res
                 
@@ -596,6 +593,17 @@ def procSync(inputData):
                     updateFacts = [[],[],[]] # modify, add, remove
                     updateModels = [[],[],[]] # modify, add, remove
                     
+                    try:
+                        deckName = os.path.basename(deck.path)
+                        mediaDir = re.sub("(?i)\.(anki)$", ".media/", deckName)
+                    except:
+                        mediaDir = "media/"
+                    mediaDir = ""
+                    soundRe = '\[sound:([^\Z]+?)\]'
+                    soundSub = '<embed target="myself" type="audio/mpeg" loop="true" height="50" width="50" href="%s\\1"></embed>' % mediaDir
+                    imageRe = '\[image:([^\Z]+?)\]'
+                    imageSub = 'image:%s/\\1' % mediaDir
+                    
                     pickTemp = pickCards
                     pickCards = []
                     for c in pickTemp:
@@ -610,6 +618,11 @@ def procSync(inputData):
                             a = runFilter("drawAnswer", a, card)
                         except:
                             pass
+                        #[sound:0f69b0f7e968546b4dce403c5386a07d.mp3]
+                        q = re.sub(soundRe, soundSub, q)
+                        a = re.sub(soundRe, soundSub, a)
+                        q = re.sub(imageRe, imageSub, q)
+                        a = re.sub(imageRe, imageSub, a)
                         c[cardQuestionIndex] = q
                         c[cardAnswerIndex] = a
                         pickCards.append(c)

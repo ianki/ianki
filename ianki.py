@@ -1,4 +1,4 @@
-# Copyright (C) 2008 Victor Miura
+# Copyright (C) 2008-2010 Victor Miura
 # License: GNU GPL, version 3 or later; http://www.gnu.org/copyleft/gpl.html
 
 import sys
