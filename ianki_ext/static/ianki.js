@@ -144,8 +144,8 @@ function getRandomArbitary(min, max)
 }
 
 function dbOpen(name, version, desc, size){   
-    //var db = window.openDatabase(name, version, desc, size);
-    var db = window.openDatabase(name, version, desc);
+    var db = window.openDatabase(name, version, desc, size);
+    //var db = window.openDatabase(name, version, desc);
     if (!db)
         alert("Failed to open the database on disk.  This is probably because the version was bad or there is not enough space left in this domain's quota");
     else
